@@ -9,17 +9,26 @@ export default defineConfig({
     outDir: 'dist',
     assetsDir: 'assets',
     sourcemap: false,
+    rollupOptions: {
+      output: {
+        manualChunks: undefined, // Prevent chunk splitting for iframe compatibility
+      },
+    },
   },
   server: {
     headers: {
-      // Content Security Policy for Blast Mobile iframe support
-      'Content-Security-Policy': 'frame-ancestors https://dapptest-d45v.develop.testblast.io https://app.blast.io; script-src \'self\' \'unsafe-inline\' https://assets.blast.io;',
+      // Enhanced CSP for Blast Mobile iframe environment
+      'Content-Security-Policy': "frame-ancestors 'self' https://*.blast.io https://*.testblast.io https://app.blast.io https://dapptest-d45v.develop.testblast.io; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://assets.blast.io; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; connect-src 'self' https: wss:;",
+      'X-Frame-Options': 'ALLOWALL',
+      'Access-Control-Allow-Origin': '*',
+      'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
+      'Access-Control-Allow-Headers': 'Content-Type, Authorization',
     },
-    host: true, // Allow external connections for mobile testing
-    port: 3002, // Match the current running port
-    strictPort: false, // Allow port fallback
+    host: true,
+    port: 3002,
+    strictPort: false,
     hmr: {
-      port: 3002, // Ensure HMR uses the same port
+      port: 3002,
     },
   },
   define: {

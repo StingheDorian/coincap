@@ -47,6 +47,26 @@ function App() {
   const [pullCurrentY, setPullCurrentY] = useState(0);
   const [isPulling, setIsPulling] = useState(false);
   const [showScrollTop, setShowScrollTop] = useState(false);
+  const [isBlastMobile, setIsBlastMobile] = useState(false);
+
+  // Detect Blast Mobile environment
+  useEffect(() => {
+    const isIframe = window !== window.top;
+    const hasBlastSDK = typeof (window as any).BlastSDK !== 'undefined';
+    const isBlastEnv = isIframe || hasBlastSDK || window.location.href.includes('blast.io');
+    
+    setIsBlastMobile(isBlastEnv);
+    console.log('Blast Mobile detected:', isBlastEnv, { isIframe, hasBlastSDK });
+    
+    // Set iframe-friendly styles
+    if (isIframe) {
+      document.body.classList.add('iframe-mode');
+      document.getElementById('root')?.classList.add('iframe-mode');
+      
+      // Notify parent frame that app is ready
+      window.parent?.postMessage({ type: 'APP_READY', source: 'blast-crypto' }, '*');
+    }
+  }, []);
 
   // Load favorites from localStorage on component mount
   useEffect(() => {
@@ -577,7 +597,7 @@ function App() {
             </div>
           ) : (
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-              <span>Built on Blast</span>
+              <span>{isBlastMobile ? '📱 Blast Mobile' : 'Built on Blast'}</span>
               <WalletConnect onWalletChange={setWalletAddress} />
             </div>
           )}

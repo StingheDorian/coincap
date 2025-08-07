@@ -4,9 +4,15 @@
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/vite.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, user-scalable=yes, viewport-fit=cover, shrink-to-fit=no" />
+    <meta http-equiv="Content-Security-Policy" content="frame-ancestors 'self' https://*.blast.io https://*.testblast.io; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://assets.blast.io; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; connect-src 'self' https: wss:;">
     <title>Blast Crypto - Built on Blast</title>
-    <!-- Blast Mobile iframe-ffi library for testing environment -->
-    <script src="https://assets.blast.io/lib/pwa-debug-sdk-1.0.1.umd.min.js"></script>
+    <!-- Blast Mobile iframe-ffi library for both testing and production -->
+    <script>
+      // Ensure iframe-friendly environment
+      window.isIframe = window !== window.top;
+      console.log('Running in iframe:', window.isIframe);
+    </script>
+    <script src="https://assets.blast.io/lib/pwa-debug-sdk-1.0.1.umd.min.js" onerror="console.log('Blast SDK not available, running in standalone mode')"></script>
   </head>
   <body>
     <div id="root"></div>
