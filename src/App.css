@@ -169,11 +169,16 @@ body.iframe-mode .search-container {
   max-width: 100vw;
   overflow-x: hidden;
   box-sizing: border-box;
+  display: grid;
+  grid-template-rows: 1fr;
+  grid-template-columns: 1fr;
+  min-height: calc(100vh - 220px); /* Ensure consistent height */
 }
 
 /* Iframe-specific content positioning */
 body.iframe-mode .content {
   margin-top: 180px; /* Account for header + search + iframe toolbar */
+  min-height: calc(100vh - 260px);
 }
 
 /* Crypto List - Row Layout */
@@ -184,6 +189,41 @@ body.iframe-mode .content {
   width: 100%;
   max-width: 100%;
   padding: 0; /* Clean, no extra spacing */
+}
+
+/* Screen Content Container - Consistent grid layout for all screens */
+.screen-content {
+  width: 100%;
+  max-width: 100%;
+  padding: 0;
+  box-sizing: border-box;
+  background: #11140C;
+  display: grid;
+  grid-template-rows: auto 1fr;
+  grid-template-columns: 1fr;
+  min-height: 100%;
+  overflow-y: auto;
+}
+
+/* Screen content without search bar */
+.screen-content.no-search {
+  grid-template-rows: 1fr;
+}
+
+/* Search bar container for consistent spacing */
+.search-container {
+  grid-row: 1;
+  width: 100%;
+  background: #11140C;
+  border-bottom: 1px solid #404833;
+}
+
+/* Main content area in grid */
+.content-area {
+  grid-row: 2;
+  width: 100%;
+  overflow-y: auto;
+  background: #11140C;
 }
 
 /* Crypto Row Styling */
@@ -471,7 +511,10 @@ body.iframe-mode .content {
 
 .nav-item.active {
   background: linear-gradient(135deg, #FCFC03 0%, #75835D 100%); /* Blast Yellow to Camo */
-  color: #11140C; /* Black text when active */
+  color: #11140C !important; /* Black text when active */
+  border: 2px solid #FCFC03;
+  box-shadow: 0 0 10px rgba(252, 252, 3, 0.3);
+  transform: scale(1.05);
 }
 
 .nav-icon {

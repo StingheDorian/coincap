@@ -316,122 +316,129 @@ function App() {
     switch (activeTab) {
       case 'home':
         return (
-          <>
-            <SearchBar
-              value={searchQuery}
-              onChange={handleSearchChange}
-              placeholder="Search cryptocurrencies..."
-              isLoading={loading || isSearching}
-            />
+          <div className="screen-content">
+            <div className="search-container">
+              <SearchBar
+                value={searchQuery}
+                onChange={handleSearchChange}
+                placeholder="Search cryptocurrencies..."
+                isLoading={loading || isSearching}
+              />
+            </div>
             
-            {error && (
-              <div style={{ padding: '1rem' }}>
-                <div className="error">
-                  {error}
-                  <button 
-                    onClick={loadCryptocurrencies}
-                    style={{ 
-                      marginLeft: '1rem', 
-                      padding: '0.5rem 1rem', 
-                      background: '#FCFC03', 
-                      color: '#11140C', 
-                      border: '2px solid #75835D',
-                      borderRadius: '4px',
-                      fontWeight: '600',
-                      cursor: 'pointer'
-                    }}
-                  >
-                    Retry
-                  </button>
-                </div>
-              </div>
-            )}
-            
-            {loading ? (
-              <LoadingSkeleton count={10} />
-            ) : (
-              <div className="crypto-list">
-                {(searchQuery ? searchResults : cryptos).map((crypto) => (
-                  <CryptoRow 
-                    key={crypto.id} 
-                    crypto={crypto} 
-                    isFavorite={favorites.has(crypto.id)}
-                    onToggleFavorite={toggleFavorite}
-                  />
-                ))}
-                {searchQuery && searchResults.length === 0 && !isSearching && !loading && (
-                  <div style={{ padding: '2rem', textAlign: 'center', color: '#FCFC03' }}>
-                    No cryptocurrencies found for "{searchQuery}"
+            <div className="content-area">
+              {error && (
+                <div style={{ padding: '1rem' }}>
+                  <div className="error">
+                    {error}
+                    <button 
+                      onClick={loadCryptocurrencies}
+                      style={{ 
+                        marginLeft: '1rem', 
+                        padding: '0.5rem 1rem', 
+                        background: '#FCFC03', 
+                        color: '#11140C', 
+                        border: '2px solid #75835D',
+                        borderRadius: '4px',
+                        fontWeight: '600',
+                        cursor: 'pointer'
+                      }}
+                    >
+                      Retry
+                    </button>
                   </div>
-                )}
-              </div>
-            )}
-          </>
+                </div>
+              )}
+              
+              {loading ? (
+                <LoadingSkeleton count={10} />
+              ) : (
+                <div className="crypto-list">
+                  {(searchQuery ? searchResults : cryptos).map((crypto) => (
+                    <CryptoRow 
+                      key={crypto.id} 
+                      crypto={crypto} 
+                      isFavorite={favorites.has(crypto.id)}
+                      onToggleFavorite={toggleFavorite}
+                    />
+                  ))}
+                  {searchQuery && searchResults.length === 0 && !isSearching && !loading && (
+                    <div style={{ padding: '2rem', textAlign: 'center', color: '#FCFC03' }}>
+                      No cryptocurrencies found for "{searchQuery}"
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          </div>
         );
 
       case 'favorites':
         const favoriteCryptos = cryptos.filter(crypto => favorites.has(crypto.id));
         return (
-          <div style={{ padding: '0' }}>
-            {favorites.size === 0 ? (
-              <div style={{ padding: '2rem', textAlign: 'center', color: '#FCFC03' }}>
-                <h2 style={{ margin: '2rem 0', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem' }}>
-                  ★ Favorites
-                </h2>
-                <p style={{ marginBottom: '1rem' }}>No favorites yet!</p>
-                <p style={{ fontSize: '0.875rem', opacity: '0.8' }}>
-                  Tap the star (★) next to any cryptocurrency to add it to your favorites.
-                </p>
-              </div>
-            ) : (
-              <>
-                <div style={{ padding: '1rem', textAlign: 'center', borderBottom: '1px solid #404833' }}>
-                  <h2 style={{ margin: '0', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem', color: '#FCFC03' }}>
-                    ★ My Favorites ({favorites.size})
+          <div className="screen-content no-search">
+            <div className="content-area">
+              {favorites.size === 0 ? (
+                <div style={{ padding: '2rem', textAlign: 'center', color: '#FCFC03' }}>
+                  <h2 style={{ margin: '2rem 0', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem' }}>
+                    ★ Favorites
                   </h2>
+                  <p style={{ marginBottom: '1rem' }}>No favorites yet!</p>
+                  <p style={{ fontSize: '0.875rem', opacity: '0.8' }}>
+                    Tap the star (★) next to any cryptocurrency to add it to your favorites.
+                  </p>
                 </div>
-                <div className="crypto-list">
-                  {favoriteCryptos.map((crypto) => (
-                    <CryptoRow 
-                      key={crypto.id} 
-                      crypto={crypto} 
-                      isFavorite={true}
-                      onToggleFavorite={toggleFavorite}
-                    />
-                  ))}
-                  {favoriteCryptos.length === 0 && (
-                    <div style={{ padding: '2rem', textAlign: 'center', color: '#FCFC03', opacity: '0.7' }}>
-                      Some of your favorite cryptocurrencies are not in the current top 20 list.
-                      <br />
-                      <small>Switch to Home to find and re-favorite them.</small>
-                    </div>
-                  )}
-                </div>
-              </>
-            )}
+              ) : (
+                <>
+                  <div style={{ padding: '1rem', textAlign: 'center', borderBottom: '1px solid #404833' }}>
+                    <h2 style={{ margin: '0', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem', color: '#FCFC03' }}>
+                      ★ My Favorites ({favorites.size})
+                    </h2>
+                  </div>
+                  <div className="crypto-list">
+                    {favoriteCryptos.map((crypto) => (
+                      <CryptoRow 
+                        key={crypto.id} 
+                        crypto={crypto} 
+                        isFavorite={true}
+                        onToggleFavorite={toggleFavorite}
+                      />
+                    ))}
+                    {favoriteCryptos.length === 0 && (
+                      <div style={{ padding: '2rem', textAlign: 'center', color: '#FCFC03', opacity: '0.7' }}>
+                        Some of your favorite cryptocurrencies are not in the current top 20 list.
+                        <br />
+                        <small>Switch to Home to find and re-favorite them.</small>
+                      </div>
+                    )}
+                  </div>
+                </>
+              )}
+            </div>
           </div>
         );
 
       case 'portfolio':
         const portfolioCryptos = cryptos.filter(crypto => favorites.has(crypto.id));
         return (
-          <div style={{ padding: '0' }}>
-            {/* Wallet Holdings Section */}
-            {walletAddress && (
-              <>
-                <div style={{ padding: '1rem', textAlign: 'center', borderBottom: '1px solid #404833', background: 'linear-gradient(135deg, #11140C 0%, #404833 100%)' }}>
-                  <h2 style={{ margin: '0', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem', color: '#FCFC03' }}>
-                    💰 Wallet Holdings
-                  </h2>
-                  <div style={{ marginTop: '0.5rem', fontSize: '0.875rem', opacity: '0.9' }}>
-                    {walletAddress.slice(0, 6)}...{walletAddress.slice(-4)}
-                  </div>
-                  {isLoadingWallet && (
-                    <div style={{ marginTop: '0.5rem', fontSize: '0.75rem', color: '#98DD28' }}>
-                      🔍 Scanning wallet...
+          <div className="screen-content no-search">
+            <div className="content-area">
+              {/* Wallet Holdings Section */}
+              {walletAddress && (
+                <>
+                  <div style={{ padding: '1rem', textAlign: 'center', borderBottom: '1px solid #404833', background: 'linear-gradient(135deg, #11140C 0%, #404833 100%)' }}>
+                    <h2 style={{ margin: '0', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem', color: '#FCFC03' }}>
+                      💰 Wallet Holdings
+                    </h2>
+                    <div style={{ marginTop: '0.5rem', fontSize: '0.875rem', opacity: '0.9' }}>
+                      {walletAddress.slice(0, 6)}...{walletAddress.slice(-4)}
                     </div>
-                  )}
-                </div>
+                    {isLoadingWallet && (
+                      <div style={{ marginTop: '0.5rem', fontSize: '0.75rem', color: '#98DD28' }}>
+                        🔍 Scanning wallet...
+                      </div>
+                    )}
+                  </div>
                 
                 {walletBalances.length > 0 ? (
                   <div className="crypto-list">
@@ -544,15 +551,17 @@ function App() {
                 </div>
               </>
             )}
+            </div>
           </div>
         );
 
       case 'wallet':
         return (
-          <div style={{ padding: '1rem' }}>
-            <div style={{ textAlign: 'center', color: '#FCFC03' }}>
-              <h2 style={{ margin: '2rem 0' }}>💰 Wallet</h2>
-              {walletAddress ? (
+          <div className="screen-content no-search">
+            <div className="content-area" style={{ padding: '1rem' }}>
+              <div style={{ textAlign: 'center', color: '#FCFC03' }}>
+                <h2 style={{ margin: '2rem 0' }}>💰 Wallet</h2>
+                {walletAddress ? (
                 <div>
                   <div style={{ 
                     background: 'rgba(252, 252, 3, 0.1)', 
@@ -612,6 +621,7 @@ function App() {
                   </div>
                 </div>
               )}
+              </div>
             </div>
           </div>
         );
