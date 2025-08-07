@@ -363,7 +363,7 @@ function App() {
                     />
                   ))}
                   {searchQuery && searchResults.length === 0 && !isSearching && !loading && (
-                    <div style={{ padding: '2rem', textAlign: 'center', color: '#FCFC03' }}>
+                    <div style={{ padding: '1rem', textAlign: 'center', color: '#FCFC03' }}>
                       No cryptocurrencies found for "{searchQuery}"
                     </div>
                   )}
@@ -379,8 +379,8 @@ function App() {
           <div className="screen-content no-search">
             <div className="content-area">
               {favorites.size === 0 ? (
-                <div style={{ padding: '2rem', textAlign: 'center', color: '#FCFC03' }}>
-                  <h2 style={{ margin: '2rem 0', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem' }}>
+                <div style={{ padding: '1rem', textAlign: 'center', color: '#FCFC03' }}>
+                  <h2 style={{ margin: '1rem 0', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem' }}>
                     ★ Favorites
                   </h2>
                   <p style={{ marginBottom: '1rem' }}>No favorites yet!</p>
@@ -405,7 +405,7 @@ function App() {
                       />
                     ))}
                     {favoriteCryptos.length === 0 && (
-                      <div style={{ padding: '2rem', textAlign: 'center', color: '#FCFC03', opacity: '0.7' }}>
+                      <div style={{ padding: '1rem', textAlign: 'center', color: '#FCFC03', opacity: '0.7' }}>
                         Some of your favorite cryptocurrencies are not in the current top 20 list.
                         <br />
                         <small>Switch to Home to find and re-favorite them.</small>
@@ -484,8 +484,8 @@ function App() {
 
             {/* Watchlist Section - Always show independently */}
             {favorites.size === 0 ? (
-              <div style={{ padding: '2rem', textAlign: 'center', color: '#FCFC03' }}>
-                <h2 style={{ margin: '2rem 0', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem' }}>
+              <div style={{ padding: '1rem', textAlign: 'center', color: '#FCFC03' }}>
+                <h2 style={{ margin: '1rem 0', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem' }}>
                   ⭐ Watchlist
                 </h2>
                 <p style={{ marginBottom: '1rem' }}>Your watchlist is empty!</p>
@@ -542,7 +542,7 @@ function App() {
                     </div>
                   ))}
                   {portfolioCryptos.length === 0 && (
-                    <div style={{ padding: '2rem', textAlign: 'center', color: '#FCFC03', opacity: '0.7' }}>
+                    <div style={{ padding: '1rem', textAlign: 'center', color: '#FCFC03', opacity: '0.7' }}>
                       Some of your favorite cryptocurrencies are not in the current top 20 list.
                       <br />
                       <small>Switch to Home to find and re-favorite them.</small>
@@ -560,7 +560,7 @@ function App() {
           <div className="screen-content no-search">
             <div className="content-area" style={{ padding: '1rem' }}>
               <div style={{ textAlign: 'center', color: '#FCFC03' }}>
-                <h2 style={{ margin: '2rem 0' }}>💰 Wallet</h2>
+                <h2 style={{ margin: '1rem 0' }}>💰 Wallet</h2>
                 {walletAddress ? (
                 <div>
                   <div style={{ 

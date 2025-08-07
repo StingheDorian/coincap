@@ -163,22 +163,19 @@ body.iframe-mode .search-container {
 /* Content Area */
 .content {
   flex: 1;
-  margin-top: 140px; /* Space for smaller header + search */
+  margin-top: 80px; /* Reduced from 140px - just space for header */
   margin-bottom: 80px; /* Space for bottom nav */
   width: 100%;
   max-width: 100vw;
   overflow-x: hidden;
   box-sizing: border-box;
-  display: grid;
-  grid-template-rows: 1fr;
-  grid-template-columns: 1fr;
-  min-height: calc(100vh - 220px); /* Ensure consistent height */
+  min-height: calc(100vh - 160px); /* Reduced height calculation */
 }
 
 /* Iframe-specific content positioning */
 body.iframe-mode .content {
-  margin-top: 180px; /* Account for header + search + iframe toolbar */
-  min-height: calc(100vh - 260px);
+  margin-top: 100px; /* Reduced from 180px */
+  min-height: calc(100vh - 180px);
 }
 
 /* Crypto List - Row Layout */
@@ -191,39 +188,37 @@ body.iframe-mode .content {
   padding: 0; /* Clean, no extra spacing */
 }
 
-/* Screen Content Container - Consistent grid layout for all screens */
+/* Screen Content Container - Consistent layout for all screens */
 .screen-content {
   width: 100%;
   max-width: 100%;
   padding: 0;
+  margin: 0;
   box-sizing: border-box;
   background: #11140C;
-  display: grid;
-  grid-template-rows: auto 1fr;
-  grid-template-columns: 1fr;
   min-height: 100%;
-  overflow-y: auto;
 }
 
 /* Screen content without search bar */
 .screen-content.no-search {
-  grid-template-rows: 1fr;
+  padding-top: 0;
 }
 
 /* Search bar container for consistent spacing */
 .search-container {
-  grid-row: 1;
   width: 100%;
   background: #11140C;
   border-bottom: 1px solid #404833;
+  margin: 0;
+  padding: 0;
 }
 
-/* Main content area in grid */
+/* Main content area */
 .content-area {
-  grid-row: 2;
   width: 100%;
-  overflow-y: auto;
   background: #11140C;
+  padding: 0;
+  margin: 0;
 }
 
 /* Crypto Row Styling */
