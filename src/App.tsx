@@ -47,7 +47,6 @@ function App() {
   const [pullCurrentY, setPullCurrentY] = useState(0);
   const [isPulling, setIsPulling] = useState(false);
   const [showScrollTop, setShowScrollTop] = useState(false);
-  const [isBlastMobile, setIsBlastMobile] = useState(false);
 
   // Detect Blast Mobile environment
   useEffect(() => {
@@ -55,7 +54,6 @@ function App() {
     const hasBlastSDK = typeof (window as any).BlastSDK !== 'undefined';
     const isBlastEnv = isIframe || hasBlastSDK || window.location.href.includes('blast.io');
     
-    setIsBlastMobile(isBlastEnv);
     console.log('Blast Mobile detected:', isBlastEnv, { isIframe, hasBlastSDK });
     
     // Set iframe-friendly styles
