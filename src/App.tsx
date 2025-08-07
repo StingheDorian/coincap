@@ -35,7 +35,6 @@ function App() {
   const [allCryptos, setAllCryptos] = useState<CryptoCurrency[]>([]); // Store all loaded cryptos
   const [displayCount, setDisplayCount] = useState(20); // How many to show in home tab
   const [loading, setLoading] = useState(true);
-  const [loadingProgress, setLoadingProgress] = useState<string>(''); // Track multi-page loading progress
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState('home');
   const [walletAddress, setWalletAddress] = useState<string | null>(null);
@@ -274,13 +273,9 @@ function App() {
     try {
       setLoading(true);
       setError(null);
-      setLoadingProgress('Starting to load cryptocurrencies...');
-      
-      const data = await fetchTopCryptocurrencies(500, setLoadingProgress); // Load 500 cryptocurrencies for comprehensive coverage
+      const data = await fetchTopCryptocurrencies(250); // Load 250 cryptocurrencies for better coverage
       setAllCryptos(data); // Store all cryptocurrencies
       setCryptos(data.slice(0, displayCount)); // Show current displayCount in the main view
-      
-      setLoadingProgress(''); // Clear progress when done
       
       // Scroll to top after data loads to ensure #1 is visible
       setTimeout(() => {
@@ -288,7 +283,6 @@ function App() {
       }, 100);
     } catch (err: any) {
       console.error('Error loading cryptocurrencies:', err);
-      setLoadingProgress(''); // Clear progress on error
       
       // More specific error messages for different scenarios
       if (err.message?.includes('429') || err.response?.status === 429) {
@@ -388,23 +382,7 @@ function App() {
               )}
               
               {loading ? (
-                <>
-                  <LoadingSkeleton count={10} />
-                  {loadingProgress && (
-                    <div style={{ 
-                      padding: '1rem', 
-                      textAlign: 'center', 
-                      color: '#FCFC03',
-                      fontSize: '0.875rem',
-                      background: 'rgba(252, 252, 3, 0.1)',
-                      border: '1px solid rgba(252, 252, 3, 0.3)',
-                      borderRadius: '8px',
-                      margin: '1rem'
-                    }}>
-                      📊 {loadingProgress}
-                    </div>
-                  )}
-                </>
+                <LoadingSkeleton count={10} />
               ) : (
                 <>
                   <div className="crypto-list">
