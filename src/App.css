@@ -62,6 +62,12 @@ body.iframe-mode {
   position: relative; /* Create stacking context */
 }
 
+/* Ensure iframe mode doesn't break app functionality */
+body.iframe-mode .app {
+  height: 100vh;
+  max-height: 100vh;
+}
+
 /* Header */
 .header {
   background: linear-gradient(135deg, #11140C 0%, #404833 100%); /* Blast Camo Gradient */
@@ -120,10 +126,10 @@ body.iframe-mode .header h1 {
   z-index: 99; /* Just below header */
 }
 
-/* Iframe mode search adjustments */
+/* Iframe mode search adjustments - but keep functionality */
 body.iframe-mode .search-container {
-  top: 70px; /* Adjust for smaller header in iframe */
-  padding: 0.75rem; /* Smaller padding in iframe */
+  top: 75px; /* Adjust for smaller header in iframe */
+  padding: 0.8rem; /* Smaller padding in iframe */
 }
 
 .search-container.loading::after {
@@ -184,10 +190,10 @@ body.iframe-mode .search-input {
   padding: 0; /* Remove all padding for maximum space */
 }
 
-/* Iframe mode content adjustments */
+/* Iframe mode content adjustments - but keep functionality intact */
 body.iframe-mode .content {
-  top: 140px; /* Adjust for smaller header and search in iframe */
-  bottom: 70px; /* Smaller bottom margin in iframe */
+  top: 145px; /* Adjust for smaller header and search in iframe */
+  bottom: 60px; /* Smaller bottom margin in iframe */
 }
 
 /* Crypto List - Row Layout */
