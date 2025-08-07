@@ -109,7 +109,7 @@ body.iframe-mode .app {
   max-width: 100%;
   box-sizing: border-box;
   position: fixed; /* Fixed position right below header */
-  top: 80px; /* Position right after header */
+  top: 90px; /* Position right after header */
   left: 0;
   right: 0;
   z-index: 98; /* Below header but above content */
