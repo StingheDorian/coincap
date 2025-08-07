@@ -88,17 +88,6 @@ body.iframe-mode .app {
   box-sizing: border-box;
 }
 
-/* Iframe mode header adjustments */
-body.iframe-mode .header {
-  min-height: 70px; /* Slightly smaller in iframe to save space */
-  padding: 0.75rem;
-}
-
-body.iframe-mode .header h1 {
-  font-size: 1.25rem; /* Smaller font size in iframe */
-  margin-bottom: 0.25rem;
-}
-
 .header h1 {
   font-family: 'Chakra Petch', sans-serif;
   font-weight: 600;
@@ -126,12 +115,6 @@ body.iframe-mode .header h1 {
   z-index: 99; /* Just below header */
 }
 
-/* Iframe mode search adjustments - but keep functionality */
-body.iframe-mode .search-container {
-  top: 75px; /* Adjust for smaller header in iframe */
-  padding: 0.8rem; /* Smaller padding in iframe */
-}
-
 .search-container.loading::after {
   content: '';
   position: absolute;
@@ -155,13 +138,6 @@ body.iframe-mode .search-container {
   transition: all 0.2s;
 }
 
-/* Iframe mode search input adjustments */
-body.iframe-mode .search-input {
-  padding: 0.5rem 0.75rem; /* Smaller padding in iframe */
-  font-size: 0.9rem; /* Slightly smaller font */
-  min-height: 40px; /* Smaller minimum height */
-}
-
 .search-input:focus {
   outline: none;
   border-color: #FCFC03; /* Blast Yellow focus */
@@ -177,23 +153,11 @@ body.iframe-mode .search-input {
 /* Content Area */
 .content {
   flex: 1;
-  margin-bottom: 1rem;
+  margin-top: 160px; /* Space for fixed header + search */
+  margin-bottom: 80px; /* Space for bottom nav */
   width: 100%;
   max-width: 100vw;
   overflow-x: hidden;
-  overflow-y: auto; /* Make content area itself scrollable */
-  position: fixed; /* Fixed positioning like header/search */
-  top: 160px; /* Start after header + search bar */
-  bottom: 80px; /* End above bottom nav */
-  left: 0;
-  right: 0;
-  padding: 0; /* Remove all padding for maximum space */
-}
-
-/* Iframe mode content adjustments - but keep functionality intact */
-body.iframe-mode .content {
-  top: 145px; /* Adjust for smaller header and search in iframe */
-  bottom: 60px; /* Smaller bottom margin in iframe */
 }
 
 /* Crypto List - Row Layout */
@@ -468,12 +432,6 @@ body.iframe-mode .content {
   z-index: 1000;
   box-sizing: border-box;
   min-height: 70px; /* Ensure consistent height */
-}
-
-/* Iframe mode bottom nav adjustments */
-body.iframe-mode .bottom-nav {
-  min-height: 60px; /* Smaller in iframe to save space */
-  padding: 0.25rem 0;
 }
 
 .nav-item {
