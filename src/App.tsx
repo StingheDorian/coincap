@@ -32,6 +32,8 @@ function useDebounce<T extends (...args: any[]) => any>(
 
 function App() {
   const [cryptos, setCryptos] = useState<CryptoCurrency[]>([]);
+  const [allCryptos, setAllCryptos] = useState<CryptoCurrency[]>([]); // Store all loaded cryptos
+  const [displayCount, setDisplayCount] = useState(20); // How many to show in home tab
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState('home');
@@ -110,17 +112,24 @@ function App() {
     autoConnectBlastWallet();
   }, []);
 
-  // Auto-refresh crypto data every 30 seconds when on home tab
+  // Auto-refresh crypto data every 2 minutes when on home tab (reduced from 30 seconds to avoid rate limiting)
   useEffect(() => {
     if (activeTab !== 'home') return;
 
     const interval = setInterval(() => {
       console.log('Auto-refreshing cryptocurrency data...');
       loadCryptocurrencies();
-    }, 30000); // 30 seconds
+    }, 120000); // 2 minutes instead of 30 seconds to avoid 429 errors
 
     return () => clearInterval(interval);
-  }, [activeTab]);
+  }, [activeTab, displayCount]);
+
+  // Update displayed cryptos when displayCount or allCryptos changes
+  useEffect(() => {
+    if (allCryptos.length > 0) {
+      setCryptos(allCryptos.slice(0, displayCount));
+    }
+  }, [displayCount, allCryptos]);
 
   const autoConnectBlastWallet = async () => {
     try {
@@ -265,15 +274,24 @@ function App() {
       setLoading(true);
       setError(null);
       const data = await fetchTopCryptocurrencies(250); // Load more cryptocurrencies for better search
-      setCryptos(data.slice(0, 20)); // Still show only top 20 in the main view
+      setAllCryptos(data); // Store all 250 cryptocurrencies
+      setCryptos(data.slice(0, displayCount)); // Show current displayCount in the main view
       
       // Scroll to top after data loads to ensure #1 is visible
       setTimeout(() => {
         window.scrollTo({ top: 0, behavior: 'smooth' });
       }, 100);
-    } catch (err) {
-      setError('Failed to load cryptocurrency data. Please try again.');
+    } catch (err: any) {
       console.error('Error loading cryptocurrencies:', err);
+      
+      // More specific error messages for different scenarios
+      if (err.message?.includes('429') || err.response?.status === 429) {
+        setError('API rate limit reached. Data will auto-refresh in a few minutes, or try manual refresh later.');
+      } else if (err.message?.includes('Network Error') || err.message?.includes('CORS')) {
+        setError('Network issue detected. Please check your connection and try again.');
+      } else {
+        setError('Failed to load cryptocurrency data. Please try again later.');
+      }
     } finally {
       setLoading(false);
     }
@@ -312,6 +330,11 @@ function App() {
     }
   };
 
+  const loadMoreCryptos = () => {
+    const newCount = Math.min(displayCount + 20, allCryptos.length);
+    setDisplayCount(newCount);
+  };
+
   const renderContent = () => {
     switch (activeTab) {
       case 'home':
@@ -329,22 +352,30 @@ function App() {
             <div className="content-area">
               {error && (
                 <div style={{ padding: '1rem' }}>
-                  <div className="error">
-                    {error}
+                  <div className="error" style={{ 
+                    background: 'rgba(255, 107, 107, 0.1)', 
+                    border: '1px solid rgba(255, 107, 107, 0.3)',
+                    borderRadius: '8px',
+                    padding: '1rem',
+                    marginBottom: '1rem'
+                  }}>
+                    <div style={{ marginBottom: '0.5rem', fontWeight: '600' }}>⚠️ Connection Issue</div>
+                    <div style={{ marginBottom: '0.75rem', fontSize: '0.9rem' }}>{error}</div>
                     <button 
                       onClick={loadCryptocurrencies}
+                      disabled={loading}
                       style={{ 
-                        marginLeft: '1rem', 
                         padding: '0.5rem 1rem', 
-                        background: '#FCFC03', 
+                        background: loading ? '#666' : '#FCFC03', 
                         color: '#11140C', 
                         border: '2px solid #75835D',
                         borderRadius: '4px',
                         fontWeight: '600',
-                        cursor: 'pointer'
+                        cursor: loading ? 'not-allowed' : 'pointer',
+                        opacity: loading ? 0.6 : 1
                       }}
                     >
-                      Retry
+                      {loading ? 'Loading...' : 'Try Again'}
                     </button>
                   </div>
                 </div>
@@ -353,28 +384,60 @@ function App() {
               {loading ? (
                 <LoadingSkeleton count={10} />
               ) : (
-                <div className="crypto-list">
-                  {(searchQuery ? searchResults : cryptos).map((crypto) => (
-                    <CryptoRow 
-                      key={crypto.id} 
-                      crypto={crypto} 
-                      isFavorite={favorites.has(crypto.id)}
-                      onToggleFavorite={toggleFavorite}
-                    />
-                  ))}
-                  {searchQuery && searchResults.length === 0 && !isSearching && !loading && (
-                    <div style={{ padding: '1rem', textAlign: 'center', color: '#FCFC03' }}>
-                      No cryptocurrencies found for "{searchQuery}"
+                <>
+                  <div className="crypto-list">
+                    {(searchQuery ? searchResults : cryptos).map((crypto) => (
+                      <CryptoRow 
+                        key={crypto.id} 
+                        crypto={crypto} 
+                        isFavorite={favorites.has(crypto.id)}
+                        onToggleFavorite={toggleFavorite}
+                      />
+                    ))}
+                    {searchQuery && searchResults.length === 0 && !isSearching && !loading && (
+                      <div style={{ padding: '1rem', textAlign: 'center', color: '#FCFC03' }}>
+                        No cryptocurrencies found for "{searchQuery}"
+                      </div>
+                    )}
+                  </div>
+                  
+                  {/* Load More Button - only show when not searching and there are more cryptos to load */}
+                  {!searchQuery && displayCount < allCryptos.length && (
+                    <div style={{ padding: '1rem', textAlign: 'center' }}>
+                      <button 
+                        onClick={loadMoreCryptos}
+                        style={{ 
+                          padding: '0.75rem 1.5rem', 
+                          background: 'linear-gradient(135deg, #FCFC03 0%, #98DD28 100%)', 
+                          color: '#11140C', 
+                          border: '2px solid #75835D',
+                          borderRadius: '8px',
+                          fontWeight: '600',
+                          cursor: 'pointer',
+                          fontSize: '0.875rem',
+                          transition: 'all 0.2s ease'
+                        }}
+                        onMouseEnter={(e) => {
+                          e.currentTarget.style.transform = 'translateY(-1px)';
+                          e.currentTarget.style.boxShadow = '0 4px 12px rgba(252, 252, 3, 0.3)';
+                        }}
+                        onMouseLeave={(e) => {
+                          e.currentTarget.style.transform = 'translateY(0)';
+                          e.currentTarget.style.boxShadow = 'none';
+                        }}
+                      >
+                        Load More ({allCryptos.length - displayCount} remaining)
+                      </button>
                     </div>
                   )}
-                </div>
+                </>
               )}
             </div>
           </div>
         );
 
       case 'favorites':
-        const favoriteCryptos = cryptos.filter(crypto => favorites.has(crypto.id));
+        const favoriteCryptos = allCryptos.filter(crypto => favorites.has(crypto.id));
         return (
           <div className="screen-content no-search">
             <div className="content-area">
@@ -404,11 +467,11 @@ function App() {
                         onToggleFavorite={toggleFavorite}
                       />
                     ))}
-                    {favoriteCryptos.length === 0 && (
+                    {favoriteCryptos.length === 0 && favorites.size > 0 && (
                       <div style={{ padding: '1rem', textAlign: 'center', color: '#FCFC03', opacity: '0.7' }}>
-                        Some of your favorite cryptocurrencies are not in the current top 20 list.
+                        Some of your favorite cryptocurrencies are not in the current dataset.
                         <br />
-                        <small>Switch to Home to find and re-favorite them.</small>
+                        <small>Try refreshing to load updated data.</small>
                       </div>
                     )}
                   </div>
@@ -419,7 +482,7 @@ function App() {
         );
 
       case 'portfolio':
-        const portfolioCryptos = cryptos.filter(crypto => favorites.has(crypto.id));
+        const portfolioCryptos = allCryptos.filter(crypto => favorites.has(crypto.id));
         return (
           <div className="screen-content no-search">
             <div className="content-area">
@@ -541,11 +604,11 @@ function App() {
                       </button>
                     </div>
                   ))}
-                  {portfolioCryptos.length === 0 && (
+                  {portfolioCryptos.length === 0 && favorites.size > 0 && (
                     <div style={{ padding: '1rem', textAlign: 'center', color: '#FCFC03', opacity: '0.7' }}>
-                      Some of your favorite cryptocurrencies are not in the current top 20 list.
+                      Some of your favorite cryptocurrencies are not in the current dataset.
                       <br />
-                      <small>Switch to Home to find and re-favorite them.</small>
+                      <small>Try refreshing to load updated data.</small>
                     </div>
                   )}
                 </div>

@@ -4,19 +4,43 @@ import type { CryptoCurrency } from '../types';
 // Use CoinGecko API which has excellent CORS support and is free
 const API_BASE_URL = 'https://api.coingecko.com/api/v3';
 
-// Rate limiting for search requests
-let lastSearchTime = 0;
-const SEARCH_RATE_LIMIT = 2000; // 2 seconds between search requests (more conservative)
+// Rate limiting and caching
+let lastApiCallTime = 0;
+const API_RATE_LIMIT = 6000; // 6 seconds between main API calls to avoid 429 errors
 const searchCache = new Map<string, { data: CryptoCurrency[]; timestamp: number }>();
-const CACHE_DURATION = 300000; // 5 minute cache (longer cache)
+const CACHE_DURATION = 600000; // 10 minute cache for search results
+const mainDataCache = { data: null as CryptoCurrency[] | null, timestamp: 0 };
+const MAIN_CACHE_DURATION = 120000; // 2 minute cache for main data
 
 // Store the loaded cryptocurrencies for client-side filtering
 let loadedCryptos: CryptoCurrency[] = [];
 
 /**
  * Fetch top cryptocurrencies from CoinGecko API (free, no API key required)
+ * Implements aggressive caching and rate limiting to avoid 429 errors
  */
 export async function fetchTopCryptocurrencies(limit = 100): Promise<CryptoCurrency[]> {
+  // Check cache first
+  const currentTime = Date.now();
+  if (mainDataCache.data && currentTime - mainDataCache.timestamp < MAIN_CACHE_DURATION) {
+    console.log('Returning cached cryptocurrency data');
+    loadedCryptos = mainDataCache.data;
+    return mainDataCache.data.slice(0, limit);
+  }
+
+  // Rate limiting - ensure we don't make requests too frequently
+  if (currentTime - lastApiCallTime < API_RATE_LIMIT) {
+    console.log('Rate limited - using cached data or waiting');
+    if (mainDataCache.data) {
+      loadedCryptos = mainDataCache.data;
+      return mainDataCache.data.slice(0, limit);
+    }
+    // If no cached data, wait for rate limit
+    const waitTime = API_RATE_LIMIT - (currentTime - lastApiCallTime);
+    await new Promise(resolve => setTimeout(resolve, waitTime));
+  }
+
+  lastApiCallTime = Date.now();
   const maxRetries = 3;
   let lastError: any;
   
@@ -32,7 +56,7 @@ export async function fetchTopCryptocurrencies(limit = 100): Promise<CryptoCurre
           sparkline: false,
           price_change_percentage: '24h'
         },
-        timeout: 15000 // Increased timeout
+        timeout: 20000 // Increased timeout to 20 seconds
       });
 
       console.log('Successfully fetched real cryptocurrency data!');
@@ -49,23 +73,39 @@ export async function fetchTopCryptocurrencies(limit = 100): Promise<CryptoCurre
         maxSupply: coin.max_supply ? String(coin.max_supply) : null
       }));
 
+      // Cache the successful response
+      mainDataCache.data = cryptos;
+      mainDataCache.timestamp = Date.now();
+      
       // Store for client-side filtering
       loadedCryptos = cryptos;
       return cryptos;
-    } catch (error) {
+    } catch (error: any) {
       lastError = error;
       console.error(`Error fetching cryptocurrency data (attempt ${attempt}/${maxRetries}):`, error);
       
-      if (attempt < maxRetries) {
-        const delay = attempt * 2000; // Exponential backoff: 2s, 4s, 6s
+      // If it's a 429 error (rate limit), wait longer before retry
+      if (error.response?.status === 429) {
+        const delay = attempt * 10000; // 10s, 20s, 30s for rate limit errors
+        console.log(`Rate limited - waiting ${delay}ms before retry...`);
+        await new Promise(resolve => setTimeout(resolve, delay));
+      } else if (attempt < maxRetries) {
+        const delay = attempt * 3000; // 3s, 6s, 9s for other errors
         console.log(`Retrying in ${delay}ms...`);
         await new Promise(resolve => setTimeout(resolve, delay));
       }
     }
   }
   
-  console.error('All retry attempts failed:', lastError);
-  throw new Error('Failed to fetch cryptocurrency data after multiple attempts. Please check your internet connection.');
+  // If all retries failed but we have cached data, return it
+  if (mainDataCache.data) {
+    console.log('All retries failed, but returning cached data');
+    loadedCryptos = mainDataCache.data;
+    return mainDataCache.data.slice(0, limit);
+  }
+  
+  console.error('All retry attempts failed and no cached data available:', lastError);
+  throw new Error('Failed to fetch cryptocurrency data after multiple attempts. Please check your internet connection or try again later.');
 }
 
 /**
@@ -135,87 +175,11 @@ export async function searchCryptocurrencies(query: string): Promise<CryptoCurre
       crypto.name.toLowerCase().startsWith(lowerQuery)
     ).slice(0, 20); // Limit to top 20 results
 
-    // If we have good local results, return them
-    if (filteredResults.length >= 3) {
-      // Cache the results
-      searchCache.set(cacheKey, { data: filteredResults, timestamp: Date.now() });
-      console.log('Successfully filtered and cached results for:', query);
-      return filteredResults;
-    }
+    // Always cache and return local results - avoid API calls that cause 429 errors
+    searchCache.set(cacheKey, { data: filteredResults, timestamp: Date.now() });
+    console.log('Successfully filtered and cached results for:', query);
+    return filteredResults;
 
-    // If we have few or no local results, try API search for more comprehensive results
-    const currentTime = Date.now();
-    if (currentTime - lastSearchTime < SEARCH_RATE_LIMIT) {
-      console.log('Rate limited - returning local results only');
-      // Still cache and return local results even if few
-      searchCache.set(cacheKey, { data: filteredResults, timestamp: currentTime });
-      return filteredResults;
-    }
-
-    // Try API search for more comprehensive results
-    console.log('Searching API for more comprehensive results:', query);
-    lastSearchTime = currentTime;
-
-    try {
-      const response = await axios.get(`${API_BASE_URL}/search`, {
-        params: {
-          query: query
-        },
-        timeout: 8000
-      });
-
-      // Get detailed data for top 10 search results
-      const coinIds = response.data.coins.slice(0, 10).map((coin: any) => coin.id);
-      
-      if (coinIds.length === 0) {
-        // Return local results if API has nothing
-        searchCache.set(cacheKey, { data: filteredResults, timestamp: currentTime });
-        return filteredResults;
-      }
-
-      const detailsResponse = await axios.get(`${API_BASE_URL}/coins/markets`, {
-        params: {
-          vs_currency: 'usd',
-          ids: coinIds.join(','),
-          order: 'market_cap_desc',
-          sparkline: false,
-          price_change_percentage: '24h'
-        },
-        timeout: 8000
-      });
-
-      const apiResults = detailsResponse.data.map((coin: any, index: number) => ({
-        id: coin.id,
-        name: coin.name,
-        symbol: coin.symbol.toUpperCase(),
-        rank: String(coin.market_cap_rank || index + 1),
-        priceUsd: coin.current_price ? String(coin.current_price) : '0',
-        percentChange24Hr: coin.price_change_percentage_24h ? String(coin.price_change_percentage_24h) : '0',
-        marketCapUsd: coin.market_cap ? String(coin.market_cap) : '0',
-        volumeUsd24Hr: coin.total_volume ? String(coin.total_volume) : '0',
-        supply: coin.circulating_supply ? String(coin.circulating_supply) : '0',
-        maxSupply: coin.max_supply ? String(coin.max_supply) : null
-      }));
-
-      // Combine local and API results, removing duplicates
-      const combinedResults = [...filteredResults];
-      apiResults.forEach((apiResult: CryptoCurrency) => {
-        if (!combinedResults.find(local => local.id === apiResult.id)) {
-          combinedResults.push(apiResult);
-        }
-      });
-
-      const finalResults = combinedResults.slice(0, 20);
-      searchCache.set(cacheKey, { data: finalResults, timestamp: currentTime });
-      console.log('Successfully combined local and API search results for:', query);
-      return finalResults;
-
-    } catch (apiError) {
-      console.error('API search failed, returning local results:', apiError);
-      // Cache and return local results if API fails
-      searchCache.set(cacheKey, { data: filteredResults, timestamp: currentTime });
-      return filteredResults;
-    }
   } catch (error) {
     console.error('Error searching cryptocurrencies:', error);
     
