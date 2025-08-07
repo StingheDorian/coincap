@@ -17,41 +17,55 @@ let loadedCryptos: CryptoCurrency[] = [];
  * Fetch top cryptocurrencies from CoinGecko API (free, no API key required)
  */
 export async function fetchTopCryptocurrencies(limit = 100): Promise<CryptoCurrency[]> {
-  try {
-    console.log('Fetching real cryptocurrency data from CoinGecko...');
-    const response = await axios.get(`${API_BASE_URL}/coins/markets`, {
-      params: {
-        vs_currency: 'usd',
-        order: 'market_cap_desc',
-        per_page: limit,
-        page: 1,
-        sparkline: false,
-        price_change_percentage: '24h'
-      },
-      timeout: 10000
-    });
+  const maxRetries = 3;
+  let lastError: any;
+  
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    try {
+      console.log(`Fetching real cryptocurrency data from CoinGecko... (attempt ${attempt}/${maxRetries})`);
+      const response = await axios.get(`${API_BASE_URL}/coins/markets`, {
+        params: {
+          vs_currency: 'usd',
+          order: 'market_cap_desc',
+          per_page: limit,
+          page: 1,
+          sparkline: false,
+          price_change_percentage: '24h'
+        },
+        timeout: 15000 // Increased timeout
+      });
 
-    console.log('Successfully fetched real cryptocurrency data!');
-    const cryptos = response.data.map((coin: any, index: number) => ({
-      id: coin.id,
-      name: coin.name,
-      symbol: coin.symbol.toUpperCase(),
-      rank: String(index + 1),
-      priceUsd: coin.current_price ? String(coin.current_price) : '0',
-      percentChange24Hr: coin.price_change_percentage_24h ? String(coin.price_change_percentage_24h) : '0',
-      marketCapUsd: coin.market_cap ? String(coin.market_cap) : '0',
-      volumeUsd24Hr: coin.total_volume ? String(coin.total_volume) : '0',
-      supply: coin.circulating_supply ? String(coin.circulating_supply) : '0',
-      maxSupply: coin.max_supply ? String(coin.max_supply) : null
-    }));
+      console.log('Successfully fetched real cryptocurrency data!');
+      const cryptos = response.data.map((coin: any, index: number) => ({
+        id: coin.id,
+        name: coin.name,
+        symbol: coin.symbol.toUpperCase(),
+        rank: String(index + 1),
+        priceUsd: coin.current_price ? String(coin.current_price) : '0',
+        percentChange24Hr: coin.price_change_percentage_24h ? String(coin.price_change_percentage_24h) : '0',
+        marketCapUsd: coin.market_cap ? String(coin.market_cap) : '0',
+        volumeUsd24Hr: coin.total_volume ? String(coin.total_volume) : '0',
+        supply: coin.circulating_supply ? String(coin.circulating_supply) : '0',
+        maxSupply: coin.max_supply ? String(coin.max_supply) : null
+      }));
 
-    // Store for client-side filtering
-    loadedCryptos = cryptos;
-    return cryptos;
-  } catch (error) {
-    console.error('Error fetching cryptocurrency data:', error);
-    throw new Error('Failed to fetch real cryptocurrency data. Please check your internet connection.');
+      // Store for client-side filtering
+      loadedCryptos = cryptos;
+      return cryptos;
+    } catch (error) {
+      lastError = error;
+      console.error(`Error fetching cryptocurrency data (attempt ${attempt}/${maxRetries}):`, error);
+      
+      if (attempt < maxRetries) {
+        const delay = attempt * 2000; // Exponential backoff: 2s, 4s, 6s
+        console.log(`Retrying in ${delay}ms...`);
+        await new Promise(resolve => setTimeout(resolve, delay));
+      }
+    }
   }
+  
+  console.error('All retry attempts failed:', lastError);
+  throw new Error('Failed to fetch cryptocurrency data after multiple attempts. Please check your internet connection.');
 }
 
 /**
@@ -120,16 +134,10 @@ export async function searchCryptocurrencies(query: string): Promise<CryptoCurre
     ).slice(0, 20); // Limit to top 20 results
 
     if (filteredResults.length > 0) {
-      // Re-rank the filtered results to show sequential numbering (1, 2, 3...)
-      const reRankedResults = filteredResults.map((crypto, index) => ({
-        ...crypto,
-        rank: String(index + 1) // Sequential ranking for search results
-      }));
-
       // Cache the results
-      searchCache.set(cacheKey, { data: reRankedResults, timestamp: Date.now() });
+      searchCache.set(cacheKey, { data: filteredResults, timestamp: Date.now() });
       console.log('Successfully filtered and cached results for:', query);
-      return reRankedResults;
+      return filteredResults;
     }
 
     // If no results from loaded data and not rate limited, try API search as fallback
