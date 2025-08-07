@@ -316,8 +316,8 @@ function App() {
     }
   }, []);
 
-  // Debounced search function - waits 500ms after user stops typing
-  const debouncedSearch = useDebounce(performSearch, 500);
+  // Debounced search function - waits 800ms for comprehensive search
+  const debouncedSearch = useDebounce(performSearch, 800);
 
   const handleSearchChange = (query: string) => {
     setSearchQuery(query);
@@ -344,9 +344,23 @@ function App() {
               <SearchBar
                 value={searchQuery}
                 onChange={handleSearchChange}
-                placeholder="Search cryptocurrencies..."
+                placeholder="Search 250+ cryptocurrencies..."
                 isLoading={loading || isSearching}
               />
+              {isSearching && searchQuery && (
+                <div style={{ 
+                  padding: '0.5rem 1rem', 
+                  fontSize: '0.8rem', 
+                  color: '#98DD28',
+                  textAlign: 'center',
+                  background: 'rgba(152, 221, 40, 0.1)',
+                  border: '1px solid rgba(152, 221, 40, 0.3)',
+                  borderRadius: '4px',
+                  margin: '0.5rem 1rem'
+                }}>
+                  🔍 Smart Search: Searching cryptocurrency database...
+                </div>
+              )}
             </div>
             
             <div className="content-area">
@@ -395,8 +409,25 @@ function App() {
                       />
                     ))}
                     {searchQuery && searchResults.length === 0 && !isSearching && !loading && (
-                      <div style={{ padding: '1rem', textAlign: 'center', color: '#FCFC03' }}>
-                        No cryptocurrencies found for "{searchQuery}"
+                      <div style={{ padding: '1rem', textAlign: 'center' }}>
+                        <div style={{ color: '#FCFC03', marginBottom: '0.5rem' }}>
+                          No cryptocurrencies found for "{searchQuery}"
+                        </div>
+                        <div style={{ fontSize: '0.8rem', color: '#9BA885' }}>
+                          Searched through 250+ top cryptocurrencies
+                        </div>
+                      </div>
+                    )}
+                    {searchQuery && searchResults.length > 0 && (
+                      <div style={{ 
+                        padding: '0.5rem 1rem', 
+                        fontSize: '0.8rem', 
+                        color: '#98DD28',
+                        textAlign: 'center',
+                        background: 'rgba(152, 221, 40, 0.1)',
+                        borderBottom: '1px solid rgba(152, 221, 40, 0.3)'
+                      }}>
+                        📊 Found {searchResults.length} results for "{searchQuery}"
                       </div>
                     )}
                   </div>

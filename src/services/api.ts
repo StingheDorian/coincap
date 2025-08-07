@@ -146,8 +146,10 @@ export async function fetchCryptocurrencyById(id: string): Promise<CryptoCurrenc
 }
 
 /**
- * Search cryptocurrencies by filtering the already loaded data (client-side search)
- * This avoids API rate limits and provides instant results
+ * Smart Search: Comprehensive cryptocurrency search with intelligent fallback
+ * 1. First searches loaded data (instant results)
+ * 2. If no results found, searches CoinGecko's full database (10,000+ coins)
+ * 3. Implements aggressive caching to minimize API calls
  */
 export async function searchCryptocurrencies(query: string): Promise<CryptoCurrency[]> {
   try {
@@ -155,7 +157,7 @@ export async function searchCryptocurrencies(query: string): Promise<CryptoCurre
     const cacheKey = query.toLowerCase().trim();
     const cached = searchCache.get(cacheKey);
     if (cached && Date.now() - cached.timestamp < CACHE_DURATION) {
-      console.log('Returning cached search results for:', query);
+      console.log('Smart Search: Returning cached search results for:', query);
       return cached.data;
     }
 
@@ -165,23 +167,161 @@ export async function searchCryptocurrencies(query: string): Promise<CryptoCurre
     }
 
     const lowerQuery = query.toLowerCase();
-    console.log('Filtering cryptocurrencies for:', query);
+    console.log('Smart Search: Starting search for:', query);
+    console.log('Smart Search: Available loaded cryptos:', loadedCryptos.length);
 
-    // First try to filter from already loaded data (instant results)
-    const filteredResults = loadedCryptos.filter(crypto => 
-      crypto.name.toLowerCase().includes(lowerQuery) ||
-      crypto.symbol.toLowerCase().includes(lowerQuery) ||
-      crypto.symbol.toLowerCase().startsWith(lowerQuery) ||
-      crypto.name.toLowerCase().startsWith(lowerQuery)
-    ).slice(0, 20); // Limit to top 20 results
+    // Step 1: Filter from already loaded data (instant results)
+    // Also check mainDataCache.data as backup
+    const availableCryptos = loadedCryptos.length > 0 ? loadedCryptos : (mainDataCache.data || []);
+    console.log('Smart Search: Using crypto data source with', availableCryptos.length, 'cryptos');
+    
+    // Enhanced search logic - prioritize exact matches, then partial matches
+    const exactMatches = availableCryptos.filter(crypto => 
+      crypto.symbol.toLowerCase() === lowerQuery ||
+      crypto.name.toLowerCase() === lowerQuery
+    );
+    
+    const symbolStartMatches = availableCryptos.filter(crypto => 
+      crypto.symbol.toLowerCase().startsWith(lowerQuery) &&
+      !exactMatches.some(exact => exact.id === crypto.id)
+    );
+    
+    const nameStartMatches = availableCryptos.filter(crypto => 
+      crypto.name.toLowerCase().startsWith(lowerQuery) &&
+      !exactMatches.some(exact => exact.id === crypto.id) &&
+      !symbolStartMatches.some(symbol => symbol.id === crypto.id)
+    );
+    
+    const partialMatches = availableCryptos.filter(crypto => 
+      (crypto.name.toLowerCase().includes(lowerQuery) || 
+       crypto.symbol.toLowerCase().includes(lowerQuery)) &&
+      !exactMatches.some(exact => exact.id === crypto.id) &&
+      !symbolStartMatches.some(symbol => symbol.id === crypto.id) &&
+      !nameStartMatches.some(name => name.id === crypto.id)
+    );
+    
+    // Combine results in order of relevance
+    const localResults = [
+      ...exactMatches,
+      ...symbolStartMatches,
+      ...nameStartMatches,
+      ...partialMatches
+    ].slice(0, 20);
 
-    // Always cache and return local results - avoid API calls that cause 429 errors
-    searchCache.set(cacheKey, { data: filteredResults, timestamp: Date.now() });
-    console.log('Successfully filtered and cached results for:', query);
-    return filteredResults;
+    console.log(`Smart Search: Found ${localResults.length} local results for "${query}"`);
+
+    // If we found good local results, return them
+    if (localResults.length >= 1) { // Lowered threshold from 3 to 1
+      console.log(`Smart Search: Returning ${localResults.length} local results`);
+      searchCache.set(cacheKey, { data: localResults, timestamp: Date.now() });
+      return localResults;
+    }
+
+    // If no local data available, return empty results
+    if (availableCryptos.length === 0) {
+      console.log('Smart Search: No local crypto data available yet');
+      return [];
+    }
+
+    // Step 2: Only search comprehensive database for very specific cases to avoid rate limits
+    console.log('Smart Search: No local results found. Checking if comprehensive search is worth the API call...');
+    
+    // Only do API search for longer, more specific queries to reduce rate limit hits
+    if (query.length < 3) {
+      console.log('Smart Search: Query too short for API search, returning empty results');
+      return [];
+    }
+
+    // Rate limiting check for API search - be more conservative
+    const currentTime = Date.now();
+    if (currentTime - lastApiCallTime < API_RATE_LIMIT * 1.5) { // 1.5x rate limit for search (9 seconds)
+      console.log('Smart Search: Rate limited, returning local results only');
+      searchCache.set(cacheKey, { data: localResults, timestamp: Date.now() });
+      return localResults;
+    }
+
+    try {
+      lastApiCallTime = Date.now();
+      
+      // Use CoinGecko's search endpoint for comprehensive results
+      console.log('Smart Search: Making API call to CoinGecko search endpoint');
+      const searchResponse = await axios.get(`${API_BASE_URL}/search`, {
+        params: { query: query },
+        timeout: 10000
+      });
+
+      const searchHits = searchResponse.data.coins || [];
+      console.log(`Smart Search: API search found ${searchHits.length} potential matches`);
+      
+      if (searchHits.length === 0) {
+        console.log('Smart Search: No results in comprehensive database');
+        searchCache.set(cacheKey, { data: localResults, timestamp: Date.now() });
+        return localResults;
+      }
+
+      // Get detailed market data for the found coins (limit to top 10 to avoid rate limits)
+      const coinIds = searchHits.slice(0, 10).map((coin: any) => coin.id).join(',');
+      console.log('Smart Search: Fetching market data for:', coinIds);
+      
+      // Wait a moment to avoid rapid consecutive API calls
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      
+      const marketResponse = await axios.get(`${API_BASE_URL}/coins/markets`, {
+        params: {
+          vs_currency: 'usd',
+          ids: coinIds,
+          order: 'market_cap_desc',
+          per_page: 10,
+          page: 1,
+          sparkline: false,
+          price_change_percentage: '24h'
+        },
+        timeout: 15000
+      });
+
+      const comprehensiveResults = marketResponse.data.map((coin: any) => ({
+        id: coin.id,
+        name: coin.name,
+        symbol: coin.symbol.toUpperCase(),
+        rank: String(coin.market_cap_rank || 999),
+        priceUsd: coin.current_price ? String(coin.current_price) : '0',
+        percentChange24Hr: coin.price_change_percentage_24h ? String(coin.price_change_percentage_24h) : '0',
+        marketCapUsd: coin.market_cap ? String(coin.market_cap) : '0',
+        volumeUsd24Hr: coin.total_volume ? String(coin.total_volume) : '0',
+        supply: coin.circulating_supply ? String(coin.circulating_supply) : '0',
+        maxSupply: coin.max_supply ? String(coin.max_supply) : null
+      }));
+
+      console.log(`Smart Search: Got ${comprehensiveResults.length} detailed results from API`);
+
+      // Combine local and comprehensive results, prioritizing by market cap
+      const combinedResults = [...localResults, ...comprehensiveResults]
+        .filter((crypto, index, self) => 
+          index === self.findIndex(c => c.id === crypto.id) // Remove duplicates
+        )
+        .sort((a, b) => {
+          const aMarketCap = parseFloat(a.marketCapUsd) || 0;
+          const bMarketCap = parseFloat(b.marketCapUsd) || 0;
+          return bMarketCap - aMarketCap; // Sort by market cap descending
+        })
+        .slice(0, 20); // Limit to top 20 results
+
+      console.log(`Smart Search: Final result: ${combinedResults.length} total results (${localResults.length} local + ${comprehensiveResults.length} comprehensive)`);
+      
+      // Cache the combined results
+      searchCache.set(cacheKey, { data: combinedResults, timestamp: Date.now() });
+      return combinedResults;
+
+    } catch (apiError: any) {
+      console.error('Smart Search: API search failed, using local results:', apiError);
+      
+      // If API search fails, return local results
+      searchCache.set(cacheKey, { data: localResults, timestamp: Date.now() });
+      return localResults;
+    }
 
   } catch (error) {
-    console.error('Error searching cryptocurrencies:', error);
+    console.error('Smart Search: Error during search:', error);
     
     // Try to return cached results even if stale, or empty array
     const cacheKey = query.toLowerCase().trim();
