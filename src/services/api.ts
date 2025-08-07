@@ -146,7 +146,77 @@ export async function fetchCryptocurrencyById(id: string): Promise<CryptoCurrenc
 }
 
 /**
- * Smart Search: Comprehensive cryptocurrency search with intelligent fallback
+ * Fetch missing favorite cryptocurrencies that aren't in the main loaded list
+ * This ensures favorites from search results are displayed even if they're outside top 250
+ */
+export async function fetchMissingFavorites(favoriteIds: string[], loadedCryptos: CryptoCurrency[]): Promise<CryptoCurrency[]> {
+  try {
+    // Find which favorites are missing from the loaded data
+    const loadedIds = new Set(loadedCryptos.map(crypto => crypto.id));
+    const missingIds = favoriteIds.filter(id => !loadedIds.has(id));
+    
+    if (missingIds.length === 0) {
+      console.log('No missing favorites to fetch');
+      return [];
+    }
+    
+    console.log(`Fetching ${missingIds.length} missing favorite cryptocurrencies:`, missingIds);
+    
+    // Rate limiting check
+    const currentTime = Date.now();
+    if (currentTime - lastApiCallTime < API_RATE_LIMIT) {
+      console.log('Rate limited - cannot fetch missing favorites right now');
+      return [];
+    }
+    
+    lastApiCallTime = Date.now();
+    
+    // Fetch market data for missing favorites (limit to 50 to avoid rate limits)
+    const idsToFetch = missingIds.slice(0, 50).join(',');
+    
+    const response = await axios.get(`${API_BASE_URL}/coins/markets`, {
+      params: {
+        vs_currency: 'usd',
+        ids: idsToFetch,
+        order: 'market_cap_desc',
+        per_page: 50,
+        page: 1,
+        sparkline: false,
+        price_change_percentage: '24h'
+      },
+      timeout: 15000
+    });
+
+    const missingFavorites = response.data.map((coin: any) => ({
+      id: coin.id,
+      name: coin.name,
+      symbol: coin.symbol.toUpperCase(),
+      rank: String(coin.market_cap_rank || 999),
+      priceUsd: coin.current_price ? String(coin.current_price) : '0',
+      percentChange24Hr: coin.price_change_percentage_24h ? String(coin.price_change_percentage_24h) : '0',
+      marketCapUsd: coin.market_cap ? String(coin.market_cap) : '0',
+      volumeUsd24Hr: coin.total_volume ? String(coin.total_volume) : '0',
+      supply: coin.circulating_supply ? String(coin.circulating_supply) : '0',
+      maxSupply: coin.max_supply ? String(coin.max_supply) : null
+    }));
+
+    console.log(`Successfully fetched ${missingFavorites.length} missing favorite cryptocurrencies`);
+    return missingFavorites;
+    
+  } catch (error: any) {
+    console.error('Error fetching missing favorites:', error);
+    
+    // If it's a rate limit error, don't retry immediately
+    if (error.response?.status === 429) {
+      console.log('Rate limited while fetching missing favorites');
+    }
+    
+    return [];
+  }
+}
+
+/**
+ * Smart search function for cryptocurrency data.
  * 1. First searches loaded data (instant results)
  * 2. If no results found, searches CoinGecko's full database (10,000+ coins)
  * 3. Implements aggressive caching to minimize API calls

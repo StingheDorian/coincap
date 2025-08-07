@@ -5,8 +5,8 @@ import BottomNavigation from './components/BottomNavigation';
 import LoadingSkeleton from './components/LoadingSkeleton';
 import WalletConnect from './components/WalletConnect';
 import SearchBar from './components/SearchBar';
-import { fetchTopCryptocurrencies, searchCryptocurrencies } from './services/api';
-import { autoConnectWallet, formatCurrency } from './utils';
+import { fetchTopCryptocurrencies, searchCryptocurrencies, fetchMissingFavorites } from './services/api';
+import { autoConnectWallet } from './utils';
 import { getAllWalletBalances, type WalletBalance } from './services/wallet';
 import type { CryptoCurrency } from './types';
 
@@ -33,6 +33,7 @@ function useDebounce<T extends (...args: any[]) => any>(
 function App() {
   const [cryptos, setCryptos] = useState<CryptoCurrency[]>([]);
   const [allCryptos, setAllCryptos] = useState<CryptoCurrency[]>([]); // Store all loaded cryptos
+  const [missingFavorites, setMissingFavorites] = useState<CryptoCurrency[]>([]); // Store favorites not in top 250
   const [displayCount, setDisplayCount] = useState(20); // How many to show in home tab
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -93,6 +94,36 @@ function App() {
   useEffect(() => {
     localStorage.setItem('crypto-favorites', JSON.stringify(Array.from(favorites)));
   }, [favorites]);
+
+  // Load missing favorites (favorites not in top 250) whenever favorites or allCryptos change
+  useEffect(() => {
+    const loadMissingFavorites = async () => {
+      if (favorites.size === 0 || allCryptos.length === 0) {
+        setMissingFavorites([]);
+        return;
+      }
+
+      // Find favorites that are not in the current allCryptos list
+      const currentCryptoIds = new Set(allCryptos.map(crypto => crypto.id));
+      const missingFavoriteIds = Array.from(favorites).filter(id => !currentCryptoIds.has(id));
+
+      if (missingFavoriteIds.length > 0) {
+        console.log(`Loading ${missingFavoriteIds.length} missing favorites:`, missingFavoriteIds);
+        try {
+          const missing = await fetchMissingFavorites(missingFavoriteIds, allCryptos);
+          setMissingFavorites(missing);
+          console.log(`Successfully loaded ${missing.length} missing favorites`);
+        } catch (error) {
+          console.error('Failed to load missing favorites:', error);
+          setMissingFavorites([]);
+        }
+      } else {
+        setMissingFavorites([]);
+      }
+    };
+
+    loadMissingFavorites();
+  }, [favorites, allCryptos]);
 
   const toggleFavorite = (cryptoId: string) => {
     setFavorites(prev => {
@@ -330,6 +361,28 @@ function App() {
     }
   };
 
+  const handleRefresh = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      
+      // Add haptic feedback
+      if (navigator.vibrate) {
+        navigator.vibrate(50);
+      }
+      
+      console.log('Manual refresh triggered...');
+      await loadCryptocurrencies();
+      
+      // Also refresh wallet balances if connected
+      if (walletAddress) {
+        await scanWalletBalances(walletAddress);
+      }
+    } catch (err) {
+      console.error('Manual refresh failed:', err);
+    }
+  };
+
   const loadMoreCryptos = () => {
     const newCount = Math.min(displayCount + 20, allCryptos.length);
     setDisplayCount(newCount);
@@ -469,6 +522,7 @@ function App() {
 
       case 'favorites':
         const favoriteCryptos = allCryptos.filter(crypto => favorites.has(crypto.id));
+        const allFavoriteCryptos = [...favoriteCryptos, ...missingFavorites];
         return (
           <div className="screen-content no-search">
             <div className="content-area">
@@ -490,7 +544,7 @@ function App() {
                     </h2>
                   </div>
                   <div className="crypto-list">
-                    {favoriteCryptos.map((crypto) => (
+                    {allFavoriteCryptos.map((crypto) => (
                       <CryptoRow 
                         key={crypto.id} 
                         crypto={crypto} 
@@ -513,12 +567,11 @@ function App() {
         );
 
       case 'portfolio':
-        const portfolioCryptos = allCryptos.filter(crypto => favorites.has(crypto.id));
         return (
           <div className="screen-content no-search">
             <div className="content-area">
               {/* Wallet Holdings Section */}
-              {walletAddress && (
+              {walletAddress ? (
                 <>
                   <div style={{ padding: '1rem', textAlign: 'center', borderBottom: '1px solid #404833', background: 'linear-gradient(135deg, #11140C 0%, #404833 100%)' }}>
                     <h2 style={{ margin: '0', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem', color: '#FCFC03' }}>
@@ -570,81 +623,18 @@ function App() {
                     No token balances found or balances are too small to display
                   </div>
                 )}
-                
-                {/* Separator */}
-                <div style={{ height: '1rem', background: '#404833', borderTop: '1px solid #75835D', borderBottom: '1px solid #75835D' }}></div>
-              </>
-            )}
-
-            {/* Watchlist Section - Always show independently */}
-            {favorites.size === 0 ? (
-              <div style={{ padding: '1rem', textAlign: 'center', color: '#FCFC03' }}>
-                <h2 style={{ margin: '1rem 0', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem' }}>
-                  ⭐ Watchlist
-                </h2>
-                <p style={{ marginBottom: '1rem' }}>Your watchlist is empty!</p>
-                <p style={{ fontSize: '0.875rem', opacity: '0.8' }}>
-                  Add cryptocurrencies to your favorites (★) to track them here.
-                </p>
-              </div>
-            ) : (
-              <>
-                <div style={{ padding: '1rem', textAlign: 'center', borderBottom: '1px solid #404833', background: 'linear-gradient(135deg, #11140C 0%, #404833 100%)' }}>
-                  <h2 style={{ margin: '0', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem', color: '#FCFC03' }}>
-                    ⭐ Watchlist ({favorites.size} assets)
+                </>
+              ) : (
+                <div style={{ padding: '1rem', textAlign: 'center', color: '#FCFC03' }}>
+                  <h2 style={{ margin: '1rem 0', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem' }}>
+                    💰 Portfolio
                   </h2>
-                  <div style={{ marginTop: '0.5rem', fontSize: '0.875rem', opacity: '0.9' }}>
-                    Your favorite cryptocurrencies
-                  </div>
+                  <p style={{ marginBottom: '1rem' }}>Connect your wallet to view holdings</p>
+                  <p style={{ fontSize: '0.875rem', opacity: '0.8' }}>
+                    Your crypto portfolio will appear here once connected.
+                  </p>
                 </div>
-                <div className="crypto-list">
-                  {portfolioCryptos.map((crypto) => (
-                    <div key={crypto.id} className="crypto-row" style={{ borderLeft: '3px solid #FCFC03' }}>
-                      <div className="crypto-rank">#{crypto.rank}</div>
-                      
-                      <div className="crypto-icon">
-                        {crypto.symbol.slice(0, 2).toUpperCase()}
-                      </div>
-                      
-                      <div className="crypto-info">
-                        <div className="crypto-name">{crypto.name}</div>
-                        <div className="crypto-symbol">{crypto.symbol}</div>
-                        <div style={{ fontSize: '0.75rem', color: '#9BA885', marginTop: '0.25rem' }}>
-                          Market Cap: {formatCurrency(crypto.marketCapUsd, 0)}
-                        </div>
-                      </div>
-                      
-                      <div className="crypto-price-section">
-                        <div className="crypto-price">
-                          {formatCurrency(crypto.priceUsd, crypto.priceUsd.includes('.') && parseFloat(crypto.priceUsd) < 1 ? 6 : 2)}
-                        </div>
-                        <div className={`percentage-change ${parseFloat(crypto.percentChange24Hr) >= 0 ? 'positive' : 'negative'}`}>
-                          {parseFloat(crypto.percentChange24Hr) >= 0 ? '+' : ''}{parseFloat(crypto.percentChange24Hr).toFixed(2)}%
-                        </div>
-                        <div style={{ fontSize: '0.75rem', color: '#9BA885', marginTop: '0.25rem' }}>
-                          24h Vol: {formatCurrency(crypto.volumeUsd24Hr, 0)}
-                        </div>
-                      </div>
-
-                      <button 
-                        className="favorite-button favorited"
-                        onClick={() => toggleFavorite(crypto.id)}
-                        title="Remove from watchlist"
-                      >
-                        ★
-                      </button>
-                    </div>
-                  ))}
-                  {portfolioCryptos.length === 0 && favorites.size > 0 && (
-                    <div style={{ padding: '1rem', textAlign: 'center', color: '#FCFC03', opacity: '0.7' }}>
-                      Some of your favorite cryptocurrencies are not in the current dataset.
-                      <br />
-                      <small>Try refreshing to load updated data.</small>
-                    </div>
-                  )}
-                </div>
-              </>
-            )}
+              )}
             </div>
           </div>
         );
@@ -728,7 +718,19 @@ function App() {
   return (
     <div className="app">
       <header className="header">
+        <div style={{ width: '44px' }}></div> {/* Spacer for balance */}
         <h1>CryptoCap</h1>
+        <button 
+          className="refresh-button"
+          onClick={handleRefresh}
+          disabled={loading}
+          title={loading ? 'Refreshing...' : 'Refresh data'}
+          style={{
+            animation: loading ? 'spin 1s linear infinite' : 'none'
+          }}
+        >
+          {loading ? '🔄' : '↻'}
+        </button>
       </header>
 
       <main 

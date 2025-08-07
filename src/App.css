@@ -83,8 +83,9 @@ body.iframe-mode .app {
   z-index: 100; /* High z-index to stay above everything */
   min-height: 60px; /* Reduced height from 80px to 60px */
   display: flex;
-  flex-direction: column;
-  justify-content: center;
+  flex-direction: row; /* Changed to row for horizontal layout */
+  justify-content: space-between; /* Space between title and button */
+  align-items: center; /* Center vertically */
   box-sizing: border-box;
 }
 
@@ -98,6 +99,41 @@ body.iframe-mode .header {
   font-weight: 600;
   font-size: 1.25rem; /* Reduced from 1.5rem */
   margin: 0; /* Remove margin */
+  flex: 1; /* Take up available space */
+  text-align: center; /* Center the title */
+}
+
+.refresh-button {
+  background: rgba(252, 252, 3, 0.2);
+  border: 2px solid #FCFC03;
+  border-radius: 50%;
+  width: 44px;
+  height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.25rem;
+  cursor: pointer;
+  color: #FCFC03;
+  transition: all 0.2s ease;
+  flex-shrink: 0; /* Don't shrink */
+}
+
+.refresh-button:hover:not(:disabled) {
+  background: rgba(252, 252, 3, 0.3);
+  transform: scale(1.05);
+}
+
+.refresh-button:disabled {
+  cursor: not-allowed;
+  background: rgba(152, 221, 40, 0.3);
+  border-color: #98DD28;
+  color: #98DD28;
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
 }
 
 .wallet-status {
