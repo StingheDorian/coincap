@@ -112,7 +112,7 @@ body.iframe-mode .app {
   top: 80px; /* Position right after header */
   left: 0;
   right: 0;
-  z-index: 99; /* Just below header */
+  z-index: 98; /* Below header but above content */
 }
 
 .search-container.loading::after {
