@@ -130,72 +130,92 @@ export async function searchCryptocurrencies(query: string): Promise<CryptoCurre
     // First try to filter from already loaded data (instant results)
     const filteredResults = loadedCryptos.filter(crypto => 
       crypto.name.toLowerCase().includes(lowerQuery) ||
-      crypto.symbol.toLowerCase().includes(lowerQuery)
+      crypto.symbol.toLowerCase().includes(lowerQuery) ||
+      crypto.symbol.toLowerCase().startsWith(lowerQuery) ||
+      crypto.name.toLowerCase().startsWith(lowerQuery)
     ).slice(0, 20); // Limit to top 20 results
 
-    if (filteredResults.length > 0) {
+    // If we have good local results, return them
+    if (filteredResults.length >= 3) {
       // Cache the results
       searchCache.set(cacheKey, { data: filteredResults, timestamp: Date.now() });
       console.log('Successfully filtered and cached results for:', query);
       return filteredResults;
     }
 
-    // If no results from loaded data and not rate limited, try API search as fallback
-    const now = Date.now();
-    if (now - lastSearchTime < SEARCH_RATE_LIMIT) {
-      console.log('Rate limited - no API search, returning empty results');
-      return [];
+    // If we have few or no local results, try API search for more comprehensive results
+    const currentTime = Date.now();
+    if (currentTime - lastSearchTime < SEARCH_RATE_LIMIT) {
+      console.log('Rate limited - returning local results only');
+      // Still cache and return local results even if few
+      searchCache.set(cacheKey, { data: filteredResults, timestamp: currentTime });
+      return filteredResults;
     }
 
-    // Only make API call if we have no local results and it's been long enough
-    console.log('No local results, trying API search for:', query);
-    lastSearchTime = now;
+    // Try API search for more comprehensive results
+    console.log('Searching API for more comprehensive results:', query);
+    lastSearchTime = currentTime;
 
-    const response = await axios.get(`${API_BASE_URL}/search`, {
-      params: {
-        query: query
-      },
-      timeout: 5000 // Shorter timeout
-    });
+    try {
+      const response = await axios.get(`${API_BASE_URL}/search`, {
+        params: {
+          query: query
+        },
+        timeout: 8000
+      });
 
-    // Get detailed data for top 5 search results (fewer to avoid rate limits)
-    const coinIds = response.data.coins.slice(0, 5).map((coin: any) => coin.id);
-    
-    if (coinIds.length === 0) {
-      const emptyResult: CryptoCurrency[] = [];
-      searchCache.set(cacheKey, { data: emptyResult, timestamp: now });
-      return emptyResult;
+      // Get detailed data for top 10 search results
+      const coinIds = response.data.coins.slice(0, 10).map((coin: any) => coin.id);
+      
+      if (coinIds.length === 0) {
+        // Return local results if API has nothing
+        searchCache.set(cacheKey, { data: filteredResults, timestamp: currentTime });
+        return filteredResults;
+      }
+
+      const detailsResponse = await axios.get(`${API_BASE_URL}/coins/markets`, {
+        params: {
+          vs_currency: 'usd',
+          ids: coinIds.join(','),
+          order: 'market_cap_desc',
+          sparkline: false,
+          price_change_percentage: '24h'
+        },
+        timeout: 8000
+      });
+
+      const apiResults = detailsResponse.data.map((coin: any, index: number) => ({
+        id: coin.id,
+        name: coin.name,
+        symbol: coin.symbol.toUpperCase(),
+        rank: String(coin.market_cap_rank || index + 1),
+        priceUsd: coin.current_price ? String(coin.current_price) : '0',
+        percentChange24Hr: coin.price_change_percentage_24h ? String(coin.price_change_percentage_24h) : '0',
+        marketCapUsd: coin.market_cap ? String(coin.market_cap) : '0',
+        volumeUsd24Hr: coin.total_volume ? String(coin.total_volume) : '0',
+        supply: coin.circulating_supply ? String(coin.circulating_supply) : '0',
+        maxSupply: coin.max_supply ? String(coin.max_supply) : null
+      }));
+
+      // Combine local and API results, removing duplicates
+      const combinedResults = [...filteredResults];
+      apiResults.forEach((apiResult: CryptoCurrency) => {
+        if (!combinedResults.find(local => local.id === apiResult.id)) {
+          combinedResults.push(apiResult);
+        }
+      });
+
+      const finalResults = combinedResults.slice(0, 20);
+      searchCache.set(cacheKey, { data: finalResults, timestamp: currentTime });
+      console.log('Successfully combined local and API search results for:', query);
+      return finalResults;
+
+    } catch (apiError) {
+      console.error('API search failed, returning local results:', apiError);
+      // Cache and return local results if API fails
+      searchCache.set(cacheKey, { data: filteredResults, timestamp: currentTime });
+      return filteredResults;
     }
-
-    const detailsResponse = await axios.get(`${API_BASE_URL}/coins/markets`, {
-      params: {
-        vs_currency: 'usd',
-        ids: coinIds.join(','),
-        order: 'market_cap_desc',
-        sparkline: false,
-        price_change_percentage: '24h'
-      },
-      timeout: 5000
-    });
-
-    const results = detailsResponse.data.map((coin: any, index: number) => ({
-      id: coin.id,
-      name: coin.name,
-      symbol: coin.symbol.toUpperCase(),
-      rank: String(coin.market_cap_rank || index + 1),
-      priceUsd: coin.current_price ? String(coin.current_price) : '0',
-      percentChange24Hr: coin.price_change_percentage_24h ? String(coin.price_change_percentage_24h) : '0',
-      marketCapUsd: coin.market_cap ? String(coin.market_cap) : '0',
-      volumeUsd24Hr: coin.total_volume ? String(coin.total_volume) : '0',
-      supply: coin.circulating_supply ? String(coin.circulating_supply) : '0',
-      maxSupply: coin.max_supply ? String(coin.max_supply) : null
-    }));
-
-    // Cache the results
-    searchCache.set(cacheKey, { data: results, timestamp: now });
-    console.log('Successfully searched API and cached results for:', query);
-    
-    return results;
   } catch (error) {
     console.error('Error searching cryptocurrencies:', error);
     

@@ -253,7 +253,7 @@ function App() {
     try {
       setLoading(true);
       setError(null);
-      const data = await fetchTopCryptocurrencies(100);
+      const data = await fetchTopCryptocurrencies(250); // Load more cryptocurrencies for better search
       setCryptos(data.slice(0, 20)); // Still show only top 20 in the main view
       
       // Scroll to top after data loads to ensure #1 is visible
