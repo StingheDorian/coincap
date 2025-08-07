@@ -72,7 +72,7 @@ body.iframe-mode .app {
 .header {
   background: linear-gradient(135deg, #11140C 0%, #404833 100%); /* Blast Camo Gradient */
   color: #FCFC03; /* Blast Yellow */
-  padding: 1rem;
+  padding: 0.75rem; /* Reduced padding */
   text-align: center;
   box-shadow: 0 2px 8px rgba(0,0,0,0.1);
   position: fixed; /* Fixed position to prevent movement */
@@ -81,7 +81,7 @@ body.iframe-mode .app {
   right: 0;
   width: 100%;
   z-index: 100; /* High z-index to stay above everything */
-  min-height: 80px; /* Consistent height to prevent compression */
+  min-height: 60px; /* Reduced height from 80px to 60px */
   display: flex;
   flex-direction: column;
   justify-content: center;
@@ -96,8 +96,8 @@ body.iframe-mode .header {
 .header h1 {
   font-family: 'Chakra Petch', sans-serif;
   font-weight: 600;
-  font-size: 1.5rem;
-  margin-bottom: 0.5rem;
+  font-size: 1.25rem; /* Reduced from 1.5rem */
+  margin: 0; /* Remove margin */
 }
 
 .wallet-status {
@@ -114,7 +114,7 @@ body.iframe-mode .header {
   max-width: 100%;
   box-sizing: border-box;
   position: fixed; /* Fixed position right below header */
-  top: 90px; /* Position right after header */
+  top: 60px; /* Position right after smaller header */
   left: 0;
   right: 0;
   z-index: 98; /* Below header but above content */
@@ -122,7 +122,7 @@ body.iframe-mode .header {
 
 /* Iframe-specific search positioning */
 body.iframe-mode .search-container {
-  top: 120px; /* Account for header + iframe toolbar */
+  top: 100px; /* Account for header + iframe toolbar */
 }
 
 .search-container.loading::after {
@@ -163,7 +163,7 @@ body.iframe-mode .search-container {
 /* Content Area */
 .content {
   flex: 1;
-  margin-top: 170px; /* Space for fixed header + search */
+  margin-top: 140px; /* Space for smaller header + search */
   margin-bottom: 80px; /* Space for bottom nav */
   width: 100%;
   max-width: 100vw;
@@ -173,7 +173,7 @@ body.iframe-mode .search-container {
 
 /* Iframe-specific content positioning */
 body.iframe-mode .content {
-  margin-top: 200px; /* Account for header + search + iframe toolbar */
+  margin-top: 180px; /* Account for header + search + iframe toolbar */
 }
 
 /* Crypto List - Row Layout */

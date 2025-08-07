@@ -556,26 +556,59 @@ function App() {
               <h2 style={{ margin: '2rem 0' }}>💰 Wallet</h2>
               {walletAddress ? (
                 <div>
-                  <p style={{ marginBottom: '1rem' }}>Connected to Blast Mobile</p>
                   <div style={{ 
-                    background: 'white', 
-                    padding: '1rem', 
-                    borderRadius: '8px', 
+                    background: 'rgba(252, 252, 3, 0.1)', 
+                    padding: '1.5rem', 
+                    borderRadius: '12px', 
                     margin: '1rem 0',
-                    wordBreak: 'break-all'
+                    border: '1px solid #404833'
                   }}>
-                    <strong>Address:</strong><br />
-                    {walletAddress}
+                    <div style={{ marginBottom: '1rem' }}>
+                      <span style={{ color: '#98DD28', fontSize: '1.1rem' }}>🟢 Connected to Blast</span>
+                    </div>
+                    <div style={{ 
+                      background: 'rgba(0,0,0,0.3)', 
+                      padding: '1rem', 
+                      borderRadius: '8px',
+                      fontFamily: 'monospace',
+                      fontSize: '0.9rem',
+                      wordBreak: 'break-all',
+                      color: '#FCFC03'
+                    }}>
+                      {walletAddress}
+                    </div>
                   </div>
-                  <p>Wallet features coming soon!</p>
+                  
+                  {walletBalances.length > 0 && (
+                    <div style={{ marginTop: '1.5rem', textAlign: 'left' }}>
+                      <h3 style={{ color: '#FCFC03', marginBottom: '1rem' }}>Token Balances</h3>
+                      {walletBalances.map((balance) => (
+                        <div key={balance.symbol} style={{
+                          background: 'rgba(64, 72, 51, 0.3)',
+                          padding: '1rem',
+                          margin: '0.5rem 0',
+                          borderRadius: '8px',
+                          display: 'flex',
+                          justifyContent: 'space-between',
+                          alignItems: 'center'
+                        }}>
+                          <div>
+                            <strong style={{ color: '#FCFC03' }}>{balance.symbol}</strong>
+                            <div style={{ fontSize: '0.8rem', color: '#9BA885' }}>{balance.name}</div>
+                          </div>
+                          <div style={{ textAlign: 'right' }}>
+                            <div style={{ color: '#FCFC03', fontWeight: 'bold' }}>
+                              {parseFloat(balance.balance).toFixed(6)}
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
               ) : (
                 <div>
-                  <p style={{ marginBottom: '1rem' }}>No wallet connected</p>
-                  <p style={{ fontSize: '0.875rem', lineHeight: '1.5' }}>
-                    You can use this app to view cryptocurrency data without connecting a wallet. 
-                    Connect a wallet to access additional features like portfolio tracking and transactions.
-                  </p>
+                  <p style={{ marginBottom: '1rem', color: '#9BA885' }}>No wallet connected</p>
                   <div style={{ marginTop: '1rem' }}>
                     <WalletConnect onWalletChange={setWalletAddress} />
                   </div>
@@ -593,28 +626,7 @@ function App() {
   return (
     <div className="app">
       <header className="header">
-        <h1>Blast Crypto</h1>
-        <div className="wallet-status">
-          {walletAddress ? (
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.8rem' }}>
-              <span style={{ color: '#98DD28' }}>🟢 Connected to Blast</span>
-              <span style={{ 
-                background: 'rgba(252, 252, 3, 0.1)', 
-                padding: '0.25rem 0.5rem', 
-                borderRadius: '4px',
-                fontFamily: 'monospace',
-                fontSize: '0.75rem'
-              }}>
-                {walletAddress.slice(0, 6)}...{walletAddress.slice(-4)}
-              </span>
-            </div>
-          ) : (
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-              <span>{isBlastMobile ? '📱 Blast Mobile' : 'Built on Blast'}</span>
-              <WalletConnect onWalletChange={setWalletAddress} />
-            </div>
-          )}
-        </div>
+        <h1>CryptoCap</h1>
       </header>
 
       <main 
