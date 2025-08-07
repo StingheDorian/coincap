@@ -61,11 +61,24 @@ function App() {
     // Set iframe-friendly styles
     if (isIframe) {
       document.body.classList.add('iframe-mode');
-      document.getElementById('root')?.classList.add('iframe-mode');
+      document.documentElement.classList.add('iframe-mode'); // Also add to html element
+      console.log('Added iframe-mode class to body and html');
+      console.log('Body classes:', document.body.className);
       
       // Notify parent frame that app is ready
       window.parent?.postMessage({ type: 'APP_READY', source: 'blast-crypto' }, '*');
+    } else {
+      // Ensure classes are removed when not in iframe
+      document.body.classList.remove('iframe-mode');
+      document.documentElement.classList.remove('iframe-mode');
+      console.log('Not in iframe, removed iframe-mode classes');
     }
+
+    // Add global function for manual testing
+    (window as any).toggleIframeMode = () => {
+      document.body.classList.toggle('iframe-mode');
+      console.log('Manually toggled iframe mode. Body classes:', document.body.className);
+    };
   }, []);
 
   // Load favorites from localStorage on component mount
