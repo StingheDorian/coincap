@@ -1,5 +1,6 @@
 import { getProvider } from '../utils';
 import { getMockVestedTokens, shouldShowMockVesting } from './mockVesting';
+import { getAllBlastStakingPositions, isBlastMobileEnvironment } from './blastMobile';
 
 // Common ERC-20 tokens on Blast network
 const BLAST_TOKENS = {
@@ -377,6 +378,8 @@ export async function getAllWalletBalances(walletAddress: string): Promise<Walle
   const balances: WalletBalance[] = [];
 
   try {
+    console.log('🔍 WALLET: Starting comprehensive balance scan for', walletAddress);
+    
     // Get ETH balance
     const ethBalance = await getETHBalance(walletAddress);
     if (ethBalance && parseFloat(ethBalance.balance) > 0) {
@@ -399,27 +402,39 @@ export async function getAllWalletBalances(walletAddress: string): Promise<Walle
       if (balance) balances.push(balance);
     });
 
-    // For now, only check for Blast Points - remove other fake staking detection
-    const vestingPromises = [
-      // Only check for Blast Points (this might be real)
-      getBlastPointsBalance(walletAddress),
-    ];
+    // Get REAL Blast Mobile staking and vesting positions
+    console.log('🚀 BLAST: Fetching real staking/vesting positions...');
+    try {
+      const blastStakingPositions = await getAllBlastStakingPositions(walletAddress);
+      if (blastStakingPositions.length > 0) {
+        console.log('✅ BLAST: Found', blastStakingPositions.length, 'real staking/vesting positions');
+        balances.push(...blastStakingPositions);
+      } else {
+        console.log('📊 BLAST: No real staking/vesting positions found');
+      }
+    } catch (error) {
+      console.error('❌ BLAST: Error fetching real staking positions:', error);
+      
+      // Fallback: Try basic Blast Points detection
+      console.log('� BLAST: Trying fallback Blast Points detection...');
+      const blastPointsBalance = await getBlastPointsBalance(walletAddress);
+      if (blastPointsBalance) {
+        balances.push(blastPointsBalance);
+        console.log('✅ BLAST FALLBACK: Found Blast Points balance');
+      }
+    }
 
-    const vestingBalances = await Promise.all(vestingPromises);
-    vestingBalances.forEach(balance => {
-      if (balance) balances.push(balance);
-    });
-
-    // For now, remove fake staking detection - we need proper Blast Mobile API integration
-    // TODO: Implement proper Blast Mobile staking/yield API integration
-    console.log('🔍 WALLET: Skipping generic staking scan - requires proper Blast Mobile API integration');
-
-    // Add mock vesting data for demonstration in development
-    if (shouldShowMockVesting(walletAddress)) {
+    // Add mock vesting data for demonstration in development (if no real data found)
+    const hasRealVesting = balances.some(b => b.isVested);
+    if (!hasRealVesting && shouldShowMockVesting(walletAddress)) {
       const mockVesting = getMockVestedTokens(walletAddress);
       balances.push(...mockVesting);
-      console.log('Added mock vesting data for demonstration:', mockVesting.length, 'positions');
+      console.log('🎭 DEMO: Added mock vesting data for demonstration:', mockVesting.length, 'positions');
     }
+
+    // Check if running in Blast Mobile for better logging
+    const isBlastEnv = isBlastMobileEnvironment();
+    console.log(`📱 ENVIRONMENT: ${isBlastEnv ? 'Blast Mobile' : 'Standalone'} - Found ${balances.length} total positions`);
 
   } catch (error) {
     console.error('Error getting wallet balances:', error);

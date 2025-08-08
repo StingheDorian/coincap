@@ -8,6 +8,7 @@ import SearchBar from './components/SearchBar';
 import { fetchTopCryptocurrencies, searchCryptocurrencies, fetchMissingFavorites } from './services/api';
 import { autoConnectWallet } from './utils';
 import { getAllWalletBalances, type WalletBalance } from './services/wallet';
+import { autoConnectBlastWallet as connectBlastMobile, isBlastMobileEnvironment } from './services/blastMobile';
 import type { CryptoCurrency } from './types';
 
 // Debounce utility function
@@ -277,13 +278,31 @@ function App() {
 
   const autoConnectBlastWallet = async () => {
     try {
-      const accounts = await autoConnectWallet();
-      if (accounts && accounts.length > 0) {
-        setWalletAddress(accounts[0]);
-        console.log('Auto-connected to Blast wallet:', accounts[0]);
+      console.log('🚀 BLAST: Starting Blast Mobile auto-connect...');
+      
+      // Try Blast Mobile auto-connect first
+      let connectedAccount = null;
+      
+      if (isBlastMobileEnvironment()) {
+        console.log('📱 BLAST: Using Blast Mobile auto-connect');
+        connectedAccount = await connectBlastMobile();
+      }
+      
+      // Fallback to standard wallet connect if Blast Mobile fails
+      if (!connectedAccount) {
+        console.log('🔄 FALLBACK: Using standard auto-connect');
+        const accounts = await autoConnectWallet();
+        if (accounts && accounts.length > 0) {
+          connectedAccount = accounts[0];
+        }
+      }
+      
+      if (connectedAccount) {
+        setWalletAddress(connectedAccount);
+        console.log('✅ WALLET: Connected to', connectedAccount);
         
-        // Scan wallet for balances
-        await scanWalletBalances(accounts[0]);
+        // Scan wallet for balances (now includes real Blast staking data)
+        await scanWalletBalances(connectedAccount);
         
         // Listen for account changes
         if (window.ethereum) {
