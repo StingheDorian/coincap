@@ -89,7 +89,7 @@ body.iframe-mode .app {
   right: 0;
   width: 100%;
   z-index: 100; /* High z-index to stay above everything */
-  min-height: 70px; /* Better mobile height */
+  min-height: 50px; /* Reduced header height */
   display: flex;
   flex-direction: row; /* Changed to row for horizontal layout */
   justify-content: space-between; /* Space between title and button */
@@ -173,7 +173,7 @@ body.iframe-mode .header {
   max-width: 100%;
   box-sizing: border-box;
   position: fixed; /* Fixed position right below header */
-  top: 60px; /* Position right after smaller header */
+  top: 50px; /* Position right after reduced header */
   left: 0;
   right: 0;
   z-index: 98; /* Below header but above content */
@@ -181,7 +181,7 @@ body.iframe-mode .header {
 
 /* Iframe-specific search positioning */
 body.iframe-mode .search-container {
-  top: 85px; /* Header starts at 5px + header height (70px) + padding (10px) */
+  top: 65px; /* Header starts at 5px + reduced header height (50px) + buffer (10px) */
 }
 
 .search-container.loading::after {
@@ -227,19 +227,19 @@ body.iframe-mode .search-container {
 /* Content Area */
 .content {
   flex: 1;
-  margin-top: 90px; /* Adjusted for new header height */
+  margin-top: 80px; /* Adjusted for reduced header height */
   margin-bottom: 85px; /* Space for bottom nav */
   width: 100%;
   max-width: 100vw;
   overflow-x: hidden;
   box-sizing: border-box;
-  min-height: calc(100vh - 175px); /* Adjusted calculation */
+  min-height: calc(100vh - 165px); /* Adjusted calculation for reduced header */
 }
 
 /* Iframe-specific content positioning */
 body.iframe-mode .content {
-  margin-top: 165px; /* Header (5px + 70px + padding) + search container (90px) */
-  min-height: calc(100vh - 250px);
+  margin-top: 145px; /* Header (5px + 50px) + search container (90px) */
+  min-height: calc(100vh - 230px);
 }
 
 /* Crypto List - Row Layout */
