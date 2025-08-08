@@ -82,18 +82,119 @@ function App() {
     };
   }, []);
 
-  // Load favorites from localStorage on component mount
-  useEffect(() => {
-    const savedFavorites = localStorage.getItem('crypto-favorites');
-    if (savedFavorites) {
-      setFavorites(new Set(JSON.parse(savedFavorites)));
+  // Enhanced storage functions for iframe/mobile environments
+  const saveFavorites = useCallback((favoritesSet: Set<string>) => {
+    try {
+      const favoritesArray = Array.from(favoritesSet);
+      const favoritesJson = JSON.stringify(favoritesArray);
+      
+      // Try multiple storage methods for better iframe compatibility
+      try {
+        localStorage.setItem('crypto-favorites', favoritesJson);
+        console.log('Favorites saved to localStorage:', favoritesArray.length, 'items');
+      } catch (e) {
+        console.warn('localStorage failed, trying sessionStorage:', e);
+        sessionStorage.setItem('crypto-favorites', favoritesJson);
+      }
+      
+      // Also save to a backup location for iframe environments
+      try {
+        localStorage.setItem('crypto-favorites-backup', favoritesJson);
+      } catch (e) {
+        console.warn('Backup storage failed:', e);
+      }
+      
+    } catch (error) {
+      console.error('Failed to save favorites:', error);
     }
   }, []);
 
-  // Save favorites to localStorage whenever favorites change
+  const loadFavorites = useCallback(() => {
+    try {
+      // Try to load from primary location first
+      let savedFavorites = null;
+      try {
+        savedFavorites = localStorage.getItem('crypto-favorites');
+      } catch (e) {
+        console.warn('localStorage read failed, trying sessionStorage:', e);
+        savedFavorites = sessionStorage.getItem('crypto-favorites');
+      }
+      
+      // If primary failed, try backup
+      if (!savedFavorites) {
+        try {
+          savedFavorites = localStorage.getItem('crypto-favorites-backup');
+          console.log('Loaded favorites from backup storage');
+        } catch (e) {
+          console.warn('Backup storage read failed:', e);
+        }
+      }
+      
+      if (savedFavorites) {
+        const favoritesList: string[] = JSON.parse(savedFavorites);
+        const favoritesSet = new Set<string>(favoritesList);
+        setFavorites(favoritesSet);
+        console.log('Favorites loaded:', favoritesList.length, 'items', favoritesList);
+        return favoritesSet;
+      }
+    } catch (error) {
+      console.error('Failed to load favorites:', error);
+    }
+    return new Set<string>();
+  }, []);
+
+  // Test storage functionality for debugging
+  const testStorage = useCallback(() => {
+    console.log('=== Storage Test for Blast Mobile ===');
+    
+    try {
+      // Test localStorage
+      localStorage.setItem('test-storage', 'localStorage-works');
+      const localTest = localStorage.getItem('test-storage');
+      console.log('localStorage test:', localTest === 'localStorage-works' ? '✅ WORKS' : '❌ FAILED');
+      localStorage.removeItem('test-storage');
+    } catch (e) {
+      console.log('localStorage test: ❌ FAILED -', e);
+    }
+    
+    try {
+      // Test sessionStorage
+      sessionStorage.setItem('test-storage', 'sessionStorage-works');
+      const sessionTest = sessionStorage.getItem('test-storage');
+      console.log('sessionStorage test:', sessionTest === 'sessionStorage-works' ? '✅ WORKS' : '❌ FAILED');
+      sessionStorage.removeItem('test-storage');
+    } catch (e) {
+      console.log('sessionStorage test: ❌ FAILED -', e);
+    }
+    
+    // Test current favorites
+    const currentFavorites = Array.from(favorites);
+    console.log('Current favorites in memory:', currentFavorites);
+    
+    // Force reload favorites
+    const reloadedFavorites = loadFavorites();
+    console.log('Reloaded favorites from storage:', Array.from(reloadedFavorites));
+    
+    console.log('=== End Storage Test ===');
+  }, [favorites, loadFavorites]);
+
+  // Expose testStorage globally for debugging in Blast Mobile
   useEffect(() => {
-    localStorage.setItem('crypto-favorites', JSON.stringify(Array.from(favorites)));
-  }, [favorites]);
+    (window as any).testCryptoStorage = testStorage;
+    console.log('Debug: window.testCryptoStorage() available for storage testing');
+  }, [testStorage]);
+
+  // Load favorites from storage on component mount
+  useEffect(() => {
+    loadFavorites();
+  }, [loadFavorites]);
+
+  // Save favorites to storage whenever favorites change
+  useEffect(() => {
+    if (favorites.size > 0) {
+      saveFavorites(favorites);
+    }
+  }, [favorites, saveFavorites]);
 
   // Load missing favorites (favorites not in top 250) whenever favorites or allCryptos change
   useEffect(() => {
@@ -128,11 +229,21 @@ function App() {
   const toggleFavorite = (cryptoId: string) => {
     setFavorites(prev => {
       const newFavorites = new Set(prev);
+      
       if (newFavorites.has(cryptoId)) {
         newFavorites.delete(cryptoId);
+        console.log(`Removed ${cryptoId} from favorites`);
       } else {
         newFavorites.add(cryptoId);
+        console.log(`Added ${cryptoId} to favorites`);
       }
+      
+      // Immediately save to storage for better persistence in iframe environments
+      saveFavorites(newFavorites);
+      
+      console.log('Current favorites count:', newFavorites.size);
+      console.log('All favorites:', Array.from(newFavorites));
+      
       return newFavorites;
     });
   };
