@@ -26,28 +26,6 @@ const BLAST_VESTING_CONTRACTS = {
   BLAST_USDB_YIELD: '0x4300000000000000000000000000000000000001',
 };
 
-// Official Blast staking contracts from Blast documentation
-const BLAST_STAKING_CONTRACTS = {
-  // Official yield managers from Blast docs
-  ETH_YIELD_MANAGER: '0x98078db053902644191f93988341E31289E1C8FE', // ETH Yield Manager (L1)
-  USD_YIELD_MANAGER: '0xa230285d5683C74935aD14c446e137c8c8828438', // USD Yield Manager (L1)
-  
-  // L2 Bridge contracts that might hold staked tokens
-  L2_BLAST_BRIDGE: '0x4300000000000000000000000000000000000005', // L2 Blast Bridge
-  L2_STANDARD_BRIDGE: '0x4200000000000000000000000000000000000010', // L2 Standard Bridge
-  
-  // Yield providers
-  LIDO_YIELD_PROVIDER: '0x4316A00D31da1313617DbB04fD92F9fF8D1aF7Db', // Lido Yield Provider
-  DSR_YIELD_PROVIDER: '0x0733F618118bF420b6b604c969498ecf143681a8', // DSR Yield Provider
-  
-  // Additional potential staking contracts (these might hold staked positions)
-  BLAST_POINTS_STAKING: '0x2fc95838c71e76ec69ff817983BFf17c710F34E0', // Blast Points contract
-  
-  // Try scanning these L2 contracts for deposits
-  L2_CROSS_DOMAIN_MESSENGER: '0x4200000000000000000000000000000000000007',
-  L2_TO_L1_MESSAGE_PASSER: '0x4200000000000000000000000000000000000016',
-};
-
 export interface WalletBalance {
   symbol: string;
   name: string;
