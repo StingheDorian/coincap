@@ -101,7 +101,7 @@ body.iframe-mode .app {
 
 /* Iframe-specific header positioning */
 body.iframe-mode .header {
-  top: 20px; /* Extra space for Blast Mobile iframe toolbar */
+  top: 50px; /* Increased space for Blast Mobile iframe toolbar and header */
 }
 
 .header h1 {
@@ -181,7 +181,7 @@ body.iframe-mode .header {
 
 /* Iframe-specific search positioning */
 body.iframe-mode .search-container {
-  top: 100px; /* Account for header + iframe toolbar */
+  top: 150px; /* Increased space: Account for header + iframe toolbar + extra Blast Mobile space */
 }
 
 .search-container.loading::after {
@@ -238,8 +238,8 @@ body.iframe-mode .search-container {
 
 /* Iframe-specific content positioning */
 body.iframe-mode .content {
-  margin-top: 110px; /* Adjusted for iframe toolbar */
-  min-height: calc(100vh - 195px);
+  margin-top: 230px; /* Increased: Header + search container + adequate spacing */
+  min-height: calc(100vh - 315px);
 }
 
 /* Crypto List - Row Layout */
