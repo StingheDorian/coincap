@@ -51,13 +51,20 @@ function App() {
   const [isPulling, setIsPulling] = useState(false);
   const [showScrollTop, setShowScrollTop] = useState(false);
 
-  // Detect Blast Mobile environment
+  // Detect Blast Mobile environment and ensure URL compatibility
   useEffect(() => {
     const isIframe = window !== window.top;
     const hasBlastSDK = typeof (window as any).BlastSDK !== 'undefined';
     const isBlastEnv = isIframe || hasBlastSDK || window.location.href.includes('blast.io');
+    const isIOSDevice = /iPad|iPhone|iPod/.test(navigator.userAgent);
     
     console.log('Blast Mobile detected:', isBlastEnv, { isIframe, hasBlastSDK });
+    
+    // Clear URL hash on non-iOS devices for better Blast Mobile compatibility
+    if (isBlastEnv && !isIOSDevice && window.location.hash) {
+      console.log('Clearing URL hash for better Blast Mobile compatibility on non-iOS device');
+      window.history.replaceState(null, '', window.location.pathname);
+    }
     
     // Set iframe-friendly styles
     if (isIframe) {
@@ -88,26 +95,37 @@ function App() {
       const favoritesArray = Array.from(favoritesSet);
       const favoritesJson = JSON.stringify(favoritesArray);
       
-      // 1. Save to URL hash for iOS persistence (works even when localStorage is cleared)
-      try {
-        if (favoritesArray.length > 0) {
-          const encodedFavorites = encodeURIComponent(favoritesJson);
-          const newHash = `#favorites=${encodedFavorites}`;
-          
-          // Update URL without triggering page reload
-          if (window.location.hash !== newHash) {
-            window.history.replaceState(null, '', newHash);
-            console.log('Favorites saved to URL:', favoritesArray.length, 'items');
+      // 1. Save to URL hash for iOS persistence (only on iOS devices to avoid Blast Mobile issues)
+      const isIOSDevice = /iPad|iPhone|iPod/.test(navigator.userAgent);
+      const isInIframe = window.location !== window.parent.location;
+      
+      if (isIOSDevice && isInIframe) {
+        try {
+          if (favoritesArray.length > 0) {
+            const encodedFavorites = encodeURIComponent(favoritesJson);
+            const newHash = `#fav=${encodedFavorites}`;
+            
+            // Update URL without triggering page reload
+            if (window.location.hash !== newHash) {
+              window.history.replaceState(null, '', newHash);
+              console.log('🍎 iOS: Favorites saved to URL:', favoritesArray.length, 'items');
+            }
+          } else {
+            // Clear hash if no favorites
+            if (window.location.hash.includes('fav=')) {
+              window.history.replaceState(null, '', window.location.pathname);
+              console.log('🍎 iOS: Cleared favorites from URL (empty)');
+            }
           }
-        } else {
-          // Clear hash if no favorites
-          if (window.location.hash.includes('favorites=')) {
-            window.history.replaceState(null, '', window.location.pathname);
-            console.log('Cleared favorites from URL (empty)');
-          }
+        } catch (e) {
+          console.warn('URL hash save failed:', e);
         }
-      } catch (e) {
-        console.warn('URL hash save failed:', e);
+      } else {
+        // Non-iOS or non-iframe: clear any existing URL hash to avoid Blast Mobile issues
+        if (window.location.hash.includes('fav=')) {
+          window.history.replaceState(null, '', window.location.pathname);
+          console.log('Cleared URL hash for better Blast Mobile compatibility');
+        }
       }
       
       // 2. Try traditional storage methods for faster access
@@ -169,22 +187,27 @@ function App() {
       let favoritesSet = new Set<string>();
       let loadSource = '';
       
-      // 1. First priority: Load from URL hash (iOS-safe persistence)
-      try {
-        const hash = window.location.hash;
-        if (hash.includes('favorites=')) {
-          const encodedFavorites = hash.split('favorites=')[1].split('&')[0]; // Handle multiple hash params
-          const decodedFavorites = decodeURIComponent(encodedFavorites);
-          const favoritesList: string[] = JSON.parse(decodedFavorites);
-          
-          if (Array.isArray(favoritesList) && favoritesList.length > 0) {
-            favoritesSet = new Set<string>(favoritesList);
-            loadSource = 'URL hash';
-            console.log('Favorites loaded from URL hash:', favoritesList.length, 'items', favoritesList);
+      // 1. First priority: Load from URL hash (iOS-safe persistence, only check on iOS)
+      const isIOSDevice = /iPad|iPhone|iPod/.test(navigator.userAgent);
+      const isInIframe = window.location !== window.parent.location;
+      
+      if (isIOSDevice && isInIframe) {
+        try {
+          const hash = window.location.hash;
+          if (hash.includes('fav=')) {
+            const encodedFavorites = hash.split('fav=')[1].split('&')[0]; // Handle multiple hash params
+            const decodedFavorites = decodeURIComponent(encodedFavorites);
+            const favoritesList: string[] = JSON.parse(decodedFavorites);
+            
+            if (Array.isArray(favoritesList) && favoritesList.length > 0) {
+              favoritesSet = new Set<string>(favoritesList);
+              loadSource = 'URL hash (iOS)';
+              console.log('🍎 iOS: Favorites loaded from URL hash:', favoritesList.length, 'items', favoritesList);
+            }
           }
+        } catch (e) {
+          console.warn('URL hash load failed:', e);
         }
-      } catch (e) {
-        console.warn('URL hash load failed:', e);
       }
       
       // 2. Fallback: Load from localStorage/sessionStorage
@@ -209,9 +232,9 @@ function App() {
             favoritesSet = new Set<string>(favoritesList);
             console.log(`Favorites loaded from ${loadSource}:`, favoritesList.length, 'items', favoritesList);
             
-            // If loaded from storage but not in URL, sync to URL for future iOS persistence
-            if (loadSource !== 'URL hash' && favoritesSet.size > 0) {
-              console.log('Syncing favorites to URL for iOS persistence...');
+            // If loaded from storage but not in URL, sync to URL for future iOS persistence (only on iOS)
+            if (loadSource !== 'URL hash (iOS)' && favoritesSet.size > 0 && isIOSDevice && isInIframe) {
+              console.log('🍎 iOS: Syncing favorites to URL for persistence...');
               // Use setTimeout to avoid setState during render
               setTimeout(() => saveFavorites(favoritesSet), 100);
             }
@@ -258,38 +281,45 @@ function App() {
       console.log('sessionStorage test: ❌ FAILED -', e);
     }
     
-    // Test URL hash persistence
-    try {
-      const testFavorites = ['bitcoin', 'ethereum'];
-      const testJson = JSON.stringify(testFavorites);
-      const encodedTest = encodeURIComponent(testJson);
-      const testHash = `#favorites=${encodedTest}`;
-      
-      // Save to URL
-      window.history.replaceState(null, '', testHash);
-      
-      // Read back from URL
-      const currentHash = window.location.hash;
-      if (currentHash.includes('favorites=')) {
-        const extractedEncoded = currentHash.split('favorites=')[1];
-        const extractedDecoded = decodeURIComponent(extractedEncoded);
-        const extractedFavorites = JSON.parse(extractedDecoded);
-        const urlTest = JSON.stringify(extractedFavorites) === testJson;
-        console.log('URL hash persistence test:', urlTest ? '✅ WORKS' : '❌ FAILED');
+    // Test URL hash persistence (only test on iOS for Blast Mobile compatibility)
+    const isIOSDevice = /iPad|iPhone|iPod/.test(navigator.userAgent);
+    const isInIframe = window.location !== window.parent.location;
+    
+    if (isIOSDevice && isInIframe) {
+      try {
+        const testFavorites = ['bitcoin', 'ethereum'];
+        const testJson = JSON.stringify(testFavorites);
+        const encodedTest = encodeURIComponent(testJson);
+        const testHash = `#fav=${encodedTest}`;
         
-        // Restore original hash
-        if (favorites.size > 0) {
-          const originalFavorites = JSON.stringify(Array.from(favorites));
-          const originalEncoded = encodeURIComponent(originalFavorites);
-          window.history.replaceState(null, '', `#favorites=${originalEncoded}`);
+        // Save to URL
+        window.history.replaceState(null, '', testHash);
+        
+        // Read back from URL
+        const currentHash = window.location.hash;
+        if (currentHash.includes('fav=')) {
+          const extractedEncoded = currentHash.split('fav=')[1];
+          const extractedDecoded = decodeURIComponent(extractedEncoded);
+          const extractedFavorites = JSON.parse(extractedDecoded);
+          const urlTest = JSON.stringify(extractedFavorites) === testJson;
+          console.log('URL hash persistence test (iOS):', urlTest ? '✅ WORKS' : '❌ FAILED');
+          
+          // Restore original hash
+          if (favorites.size > 0) {
+            const originalFavorites = JSON.stringify(Array.from(favorites));
+            const originalEncoded = encodeURIComponent(originalFavorites);
+            window.history.replaceState(null, '', `#fav=${originalEncoded}`);
+          } else {
+            window.history.replaceState(null, '', window.location.pathname);
+          }
         } else {
-          window.history.replaceState(null, '', window.location.pathname);
+          console.log('URL hash persistence test (iOS): ❌ FAILED - could not set hash');
         }
-      } else {
-        console.log('URL hash persistence test: ❌ FAILED - could not set hash');
+      } catch (e) {
+        console.log('URL hash persistence test (iOS): ❌ FAILED -', e);
       }
-    } catch (e) {
-      console.log('URL hash persistence test: ❌ FAILED -', e);
+    } else {
+      console.log('URL hash persistence test: ⏭️ SKIPPED (not iOS + iframe - better for Blast Mobile compatibility)');
     }
     
     // Test current favorites
