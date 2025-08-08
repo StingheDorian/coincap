@@ -47,6 +47,7 @@ export async function fetchTopCryptocurrencies(limit = 100): Promise<CryptoCurre
   for (let attempt = 1; attempt <= maxRetries; attempt++) {
     try {
       console.log(`Fetching real cryptocurrency data from CoinGecko... (attempt ${attempt}/${maxRetries})`);
+      console.log('🔍 API REQUEST: Requesting', limit, 'cryptocurrencies');
       const response = await axios.get(`${API_BASE_URL}/coins/markets`, {
         params: {
           vs_currency: 'usd',
@@ -59,7 +60,7 @@ export async function fetchTopCryptocurrencies(limit = 100): Promise<CryptoCurre
         timeout: 20000 // Increased timeout to 20 seconds
       });
 
-      console.log('Successfully fetched real cryptocurrency data!');
+      console.log('✅ API RESPONSE: Successfully fetched', response.data.length, 'cryptocurrencies!');
       const cryptos = response.data.map((coin: any, index: number) => ({
         id: coin.id,
         name: coin.name,
