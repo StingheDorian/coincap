@@ -181,7 +181,7 @@ body.iframe-mode .header {
 
 /* Iframe-specific search positioning */
 body.iframe-mode .search-container {
-  top: 75px; /* Header (70px) + minimal spacing (5px) */
+  top: 85px; /* Header starts at 5px + header height (70px) + padding (10px) */
 }
 
 .search-container.loading::after {
@@ -238,8 +238,8 @@ body.iframe-mode .search-container {
 
 /* Iframe-specific content positioning */
 body.iframe-mode .content {
-  margin-top: 155px; /* Header + search container + minimal spacing */
-  min-height: calc(100vh - 240px);
+  margin-top: 165px; /* Header (5px + 70px + padding) + search container (90px) */
+  min-height: calc(100vh - 250px);
 }
 
 /* Crypto List - Row Layout */
