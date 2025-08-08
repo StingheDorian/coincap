@@ -89,16 +89,19 @@ function App() {
     };
   }, []);
 
+
+
   // Enhanced storage functions for iframe/mobile environments with URL persistence for iOS
   const saveFavorites = useCallback((favoritesSet: Set<string>) => {
     try {
       const favoritesArray = Array.from(favoritesSet);
       const favoritesJson = JSON.stringify(favoritesArray);
       
-      // 1. Save to URL hash for iOS persistence (only on iOS devices to avoid Blast Mobile issues)
+      // Device and environment detection
       const isIOSDevice = /iPad|iPhone|iPod/.test(navigator.userAgent);
       const isInIframe = window.location !== window.parent.location;
       
+      // 1. Save to URL hash for iOS persistence (only on iOS devices to avoid Blast Mobile issues)
       if (isIOSDevice && isInIframe) {
         try {
           if (favoritesArray.length > 0) {
@@ -108,17 +111,17 @@ function App() {
             // Update URL without triggering page reload
             if (window.location.hash !== newHash) {
               window.history.replaceState(null, '', newHash);
-              console.log('🍎 iOS: Favorites saved to URL:', favoritesArray.length, 'items');
+              console.log('iOS: Favorites saved to URL:', favoritesArray.length, 'items');
             }
           } else {
             // Clear hash if no favorites
             if (window.location.hash.includes('fav=')) {
               window.history.replaceState(null, '', window.location.pathname);
-              console.log('🍎 iOS: Cleared favorites from URL (empty)');
+              console.log('iOS: Cleared favorites from URL (empty)');
             }
           }
         } catch (e) {
-          console.warn('URL hash save failed:', e);
+          console.error('iOS: URL hash save failed:', e);
         }
       } else {
         // Non-iOS or non-iframe: clear any existing URL hash to avoid Blast Mobile issues
@@ -170,7 +173,7 @@ function App() {
           
           // If this is iOS in an iframe, log the solution
           if (metadata.isIOSDevice && metadata.inIframe) {
-            console.log('🍎 iOS + iframe detected: Using URL persistence for favorites! Favorites will survive app closure.');
+            console.log('iOS + iframe detected: Using URL persistence for favorites! Favorites will survive app closure.');
           }
         } catch (e) {
           console.warn('Could not save metadata:', e);
@@ -202,7 +205,7 @@ function App() {
             if (Array.isArray(favoritesList) && favoritesList.length > 0) {
               favoritesSet = new Set<string>(favoritesList);
               loadSource = 'URL hash (iOS)';
-              console.log('🍎 iOS: Favorites loaded from URL hash:', favoritesList.length, 'items', favoritesList);
+              console.log('iOS: Favorites loaded from URL hash:', favoritesList.length, 'items');
             }
           }
         } catch (e) {
@@ -230,11 +233,11 @@ function App() {
           if (savedFavorites) {
             const favoritesList: string[] = JSON.parse(savedFavorites);
             favoritesSet = new Set<string>(favoritesList);
-            console.log(`Favorites loaded from ${loadSource}:`, favoritesList.length, 'items', favoritesList);
+            console.log(`Favorites loaded from ${loadSource}:`, favoritesList.length, 'items');
             
             // If loaded from storage but not in URL, sync to URL for future iOS persistence (only on iOS)
             if (loadSource !== 'URL hash (iOS)' && favoritesSet.size > 0 && isIOSDevice && isInIframe) {
-              console.log('🍎 iOS: Syncing favorites to URL for persistence...');
+              console.log('iOS: Syncing favorites to URL for persistence...');
               // Use setTimeout to avoid setState during render
               setTimeout(() => saveFavorites(favoritesSet), 100);
             }
@@ -257,9 +260,9 @@ function App() {
     }
   }, [saveFavorites]);
 
-  // Test storage functionality for debugging (now includes URL persistence testing)
+  // Test storage functionality for debugging
   const testStorage = useCallback(() => {
-    console.log('=== Enhanced Storage Test for Blast Mobile (with URL persistence) ===');
+    console.log('=== Storage Test for Blast Mobile ===');
     
     try {
       // Test localStorage
@@ -326,39 +329,19 @@ function App() {
     const currentFavorites = Array.from(favorites);
     console.log('Current favorites in memory:', currentFavorites);
     
-    // Check URL favorites
-    try {
-      const hash = window.location.hash;
-      if (hash.includes('favorites=')) {
-        const encodedFavorites = hash.split('favorites=')[1].split('&')[0];
-        const decodedFavorites = decodeURIComponent(encodedFavorites);
-        const urlFavorites = JSON.parse(decodedFavorites);
-        console.log('Current favorites in URL:', urlFavorites);
-      } else {
-        console.log('No favorites found in URL hash');
-      }
-    } catch (e) {
-      console.log('Could not read favorites from URL:', e);
-    }
-    
-    // Force reload favorites to test the loading system
-    const reloadedFavorites = loadFavorites();
-    console.log('Reloaded favorites from storage:', Array.from(reloadedFavorites));
-    
     // iOS detection
     const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
     const inIframe = window.location !== window.parent.location;
-    console.log('🍎 iOS device:', isIOS ? 'YES' : 'NO');
-    console.log('🖼️ In iframe:', inIframe ? 'YES' : 'NO');
-    console.log('💾 URL persistence recommended:', (isIOS && inIframe) ? 'YES (iOS + iframe)' : 'NO (storage should work)');
+    console.log('iOS device:', isIOS ? 'YES' : 'NO');
+    console.log('In iframe:', inIframe ? 'YES' : 'NO');
+    console.log('URL persistence recommended:', (isIOS && inIframe) ? 'YES (iOS + iframe)' : 'NO (storage should work)');
     
-    console.log('=== End Enhanced Storage Test ===');
-  }, [favorites, loadFavorites]);
+    console.log('=== End Storage Test ===');
+  }, [favorites]);
 
   // Expose testStorage globally for debugging in Blast Mobile
   useEffect(() => {
     (window as any).testCryptoStorage = testStorage;
-    console.log('Debug: window.testCryptoStorage() available for storage testing');
   }, [testStorage]);
 
   // Load favorites from storage on component mount
