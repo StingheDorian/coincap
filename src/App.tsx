@@ -436,7 +436,7 @@ function App() {
     try {
       setLoading(true);
       setError(null);
-      const data = await fetchTopCryptocurrencies(250); // Load 250 cryptocurrencies for better coverage
+      const data = await fetchTopCryptocurrencies(100); // Load 100 cryptocurrencies (CoinGecko free tier limit)
       setAllCryptos(data); // Store all cryptocurrencies
       setCryptos(data.slice(0, displayCount)); // Show current displayCount in the main view
       
