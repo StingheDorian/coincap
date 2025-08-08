@@ -18,6 +18,7 @@ let loadedCryptos: CryptoCurrency[] = [];
 /**
  * Fetch top cryptocurrencies from CoinGecko API (free, no API key required)
  * Implements aggressive caching and rate limiting to avoid 429 errors
+ * For free tier, CoinGecko limits per_page to 100, so we fetch multiple pages if needed
  */
 export async function fetchTopCryptocurrencies(limit = 100): Promise<CryptoCurrency[]> {
   // Check cache first
@@ -44,24 +45,52 @@ export async function fetchTopCryptocurrencies(limit = 100): Promise<CryptoCurre
   const maxRetries = 3;
   let lastError: any;
   
+  // CoinGecko free tier limits per_page to 100, so calculate pages needed
+  const maxPerPage = 100;
+  const pagesNeeded = Math.ceil(limit / maxPerPage);
+  console.log(`🔍 API STRATEGY: Need ${limit} cryptos, will fetch ${pagesNeeded} pages of ${maxPerPage} each`);
+  
   for (let attempt = 1; attempt <= maxRetries; attempt++) {
     try {
       console.log(`Fetching real cryptocurrency data from CoinGecko... (attempt ${attempt}/${maxRetries})`);
-      console.log('🔍 API REQUEST: Requesting', limit, 'cryptocurrencies');
-      const response = await axios.get(`${API_BASE_URL}/coins/markets`, {
-        params: {
-          vs_currency: 'usd',
-          order: 'market_cap_desc',
-          per_page: limit,
-          page: 1,
-          sparkline: false,
-          price_change_percentage: '24h'
-        },
-        timeout: 20000 // Increased timeout to 20 seconds
-      });
+      
+      let allCryptos: any[] = [];
+      
+      // Fetch multiple pages if needed
+      for (let page = 1; page <= pagesNeeded; page++) {
+        const itemsThisPage = Math.min(maxPerPage, limit - allCryptos.length);
+        
+        console.log(`🔍 API REQUEST: Page ${page}/${pagesNeeded} - requesting ${itemsThisPage} cryptocurrencies`);
+        
+        const response = await axios.get(`${API_BASE_URL}/coins/markets`, {
+          params: {
+            vs_currency: 'usd',
+            order: 'market_cap_desc',
+            per_page: itemsThisPage,
+            page: page,
+            sparkline: false,
+            price_change_percentage: '24h'
+          },
+          timeout: 20000 // Increased timeout to 20 seconds
+        });
 
-      console.log('✅ API RESPONSE: Successfully fetched', response.data.length, 'cryptocurrencies!');
-      const cryptos = response.data.map((coin: any, index: number) => ({
+        console.log(`✅ API RESPONSE: Page ${page} returned ${response.data.length} cryptocurrencies`);
+        allCryptos.push(...response.data);
+        
+        // If we got fewer than expected, we've reached the end
+        if (response.data.length < itemsThisPage) {
+          console.log(`🔍 API INFO: Reached end of data at page ${page} with ${allCryptos.length} total items`);
+          break;
+        }
+        
+        // Add a small delay between pages to be respectful to the API
+        if (page < pagesNeeded) {
+          await new Promise(resolve => setTimeout(resolve, 1000));
+        }
+      }
+
+      console.log(`✅ API TOTAL: Successfully fetched ${allCryptos.length} cryptocurrencies across ${pagesNeeded} pages!`);
+      const cryptos = allCryptos.map((coin: any, index: number) => ({
         id: coin.id,
         name: coin.name,
         symbol: coin.symbol.toUpperCase(),
