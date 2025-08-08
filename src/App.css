@@ -244,6 +244,18 @@ body.iframe-mode .content {
   min-height: calc(100vh - 255px);
 }
 
+/* Adjust content spacing for screens without search bar */
+.content .screen-content.no-search {
+  margin-top: -80px; /* Remove the extra header space since no search bar */
+  padding-top: 50px; /* Just enough space for the header */
+}
+
+/* Iframe-specific adjustments for no-search screens */
+body.iframe-mode .content .screen-content.no-search {
+  margin-top: -170px !important; /* Remove iframe extra space */
+  padding-top: 95px !important; /* Just enough space for iframe header */
+}
+
 /* Crypto List - Row Layout */
 .crypto-list {
   display: flex;
