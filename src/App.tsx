@@ -51,132 +51,66 @@ function App() {
   const [isPulling, setIsPulling] = useState(false);
   const [showScrollTop, setShowScrollTop] = useState(false);
 
-  // Detect Blast Mobile environment and ensure URL compatibility
+  // Detect Blast Mobile environment and provide user-friendly messaging
   useEffect(() => {
     const isIframe = window !== window.top;
     const hasBlastSDK = typeof (window as any).BlastSDK !== 'undefined';
     const isBlastEnv = isIframe || hasBlastSDK || window.location.href.includes('blast.io');
     const isIOSDevice = /iPad|iPhone|iPod/.test(navigator.userAgent);
     
-    console.log('Blast Mobile detected:', isBlastEnv, { isIframe, hasBlastSDK });
+    console.log('Environment detected:', { isBlastEnv, isIframe, hasBlastSDK, isIOSDevice });
     
-    // Clear URL hash on non-iOS devices for better Blast Mobile compatibility
-    if (isBlastEnv && !isIOSDevice && window.location.hash) {
-      console.log('Clearing URL hash for better Blast Mobile compatibility on non-iOS device');
+    // Clear any URL hash for better Blast Mobile compatibility
+    if (window.location.hash) {
+      console.log('Clearing URL hash for better Blast Mobile compatibility');
       window.history.replaceState(null, '', window.location.pathname);
     }
     
     // Set iframe-friendly styles
     if (isIframe) {
       document.body.classList.add('iframe-mode');
-      document.documentElement.classList.add('iframe-mode'); // Also add to html element
+      document.documentElement.classList.add('iframe-mode');
       console.log('Added iframe-mode class to body and html');
-      console.log('Body classes:', document.body.className);
       
       // Notify parent frame that app is ready
       window.parent?.postMessage({ type: 'APP_READY', source: 'blast-crypto' }, '*');
     } else {
-      // Ensure classes are removed when not in iframe
       document.body.classList.remove('iframe-mode');
       document.documentElement.classList.remove('iframe-mode');
-      console.log('Not in iframe, removed iframe-mode classes');
     }
 
-    // Add global function for manual testing
-    (window as any).toggleIframeMode = () => {
-      document.body.classList.toggle('iframe-mode');
-      console.log('Manually toggled iframe mode. Body classes:', document.body.className);
-    };
+    // Show iOS storage limitation notice
+    if (isIOSDevice && isBlastEnv) {
+      console.log('📱 iOS + Blast Mobile: Favorites will persist during your session but may not survive app closure due to iOS limitations');
+      
+      // Store the platform info for potential user messaging
+      sessionStorage.setItem('platform-info', JSON.stringify({
+        isIOSDevice,
+        isBlastEnv,
+        storageNotice: 'Favorites persist during session but may not survive app closure on iOS'
+      }));
+    }
   }, []);
 
 
 
-  // Enhanced storage functions for iframe/mobile environments with URL persistence for iOS
+  // Simple storage function that works reliably across platforms
   const saveFavorites = useCallback((favoritesSet: Set<string>) => {
     try {
       const favoritesArray = Array.from(favoritesSet);
       const favoritesJson = JSON.stringify(favoritesArray);
       
-      // Device and environment detection
-      const isIOSDevice = /iPad|iPhone|iPod/.test(navigator.userAgent);
-      const isInIframe = window.location !== window.parent.location;
-      
-      // 1. Save to URL hash for iOS persistence (only on iOS devices to avoid Blast Mobile issues)
-      if (isIOSDevice && isInIframe) {
-        try {
-          if (favoritesArray.length > 0) {
-            const encodedFavorites = encodeURIComponent(favoritesJson);
-            const newHash = `#fav=${encodedFavorites}`;
-            
-            // Update URL without triggering page reload
-            if (window.location.hash !== newHash) {
-              window.history.replaceState(null, '', newHash);
-              console.log('iOS: Favorites saved to URL:', favoritesArray.length, 'items');
-            }
-          } else {
-            // Clear hash if no favorites
-            if (window.location.hash.includes('fav=')) {
-              window.history.replaceState(null, '', window.location.pathname);
-              console.log('iOS: Cleared favorites from URL (empty)');
-            }
-          }
-        } catch (e) {
-          console.error('iOS: URL hash save failed:', e);
-        }
-      } else {
-        // Non-iOS or non-iframe: clear any existing URL hash to avoid Blast Mobile issues
-        if (window.location.hash.includes('fav=')) {
-          window.history.replaceState(null, '', window.location.pathname);
-          console.log('Cleared URL hash for better Blast Mobile compatibility');
-        }
-      }
-      
-      // 2. Try traditional storage methods for faster access
-      let saveSuccess = false;
-      let storageMethod = '';
-      
+      // Try localStorage first, fall back to sessionStorage
       try {
         localStorage.setItem('crypto-favorites', favoritesJson);
-        console.log('Favorites saved to localStorage:', favoritesArray.length, 'items');
-        saveSuccess = true;
-        storageMethod = 'localStorage';
+        console.log('Favorites saved:', favoritesArray.length, 'items');
       } catch (e) {
-        console.warn('localStorage failed, trying sessionStorage:', e);
+        console.warn('localStorage failed, using sessionStorage:', e);
         try {
           sessionStorage.setItem('crypto-favorites', favoritesJson);
-          saveSuccess = true;
-          storageMethod = 'sessionStorage';
+          console.log('Favorites saved to session storage:', favoritesArray.length, 'items');
         } catch (e2) {
-          console.warn('sessionStorage also failed:', e2);
-        }
-      }
-      
-      // 3. Backup storage
-      try {
-        localStorage.setItem('crypto-favorites-backup', favoritesJson);
-      } catch (e) {
-        console.warn('Backup storage failed:', e);
-      }
-      
-      // 4. Save metadata about storage limitations (especially for iOS)
-      if (saveSuccess) {
-        try {
-          const metadata = {
-            storageMethod,
-            timestamp: Date.now(),
-            isIOSDevice: /iPad|iPhone|iPod/.test(navigator.userAgent),
-            inIframe: window.location !== window.parent.location,
-            userAgent: navigator.userAgent,
-            urlPersistence: true // New flag to indicate URL persistence is active
-          };
-          localStorage.setItem('crypto-favorites-meta', JSON.stringify(metadata));
-          
-          // If this is iOS in an iframe, log the solution
-          if (metadata.isIOSDevice && metadata.inIframe) {
-            console.log('iOS + iframe detected: Using URL persistence for favorites! Favorites will survive app closure.');
-          }
-        } catch (e) {
-          console.warn('Could not save metadata:', e);
+          console.warn('Both storage methods failed:', e2);
         }
       }
       
@@ -188,69 +122,30 @@ function App() {
   const loadFavorites = useCallback(() => {
     try {
       let favoritesSet = new Set<string>();
-      let loadSource = '';
       
-      // 1. First priority: Load from URL hash (iOS-safe persistence, only check on iOS)
-      const isIOSDevice = /iPad|iPhone|iPod/.test(navigator.userAgent);
-      const isInIframe = window.location !== window.parent.location;
-      
-      if (isIOSDevice && isInIframe) {
-        try {
-          const hash = window.location.hash;
-          if (hash.includes('fav=')) {
-            const encodedFavorites = hash.split('fav=')[1].split('&')[0]; // Handle multiple hash params
-            const decodedFavorites = decodeURIComponent(encodedFavorites);
-            const favoritesList: string[] = JSON.parse(decodedFavorites);
-            
-            if (Array.isArray(favoritesList) && favoritesList.length > 0) {
-              favoritesSet = new Set<string>(favoritesList);
-              loadSource = 'URL hash (iOS)';
-              console.log('iOS: Favorites loaded from URL hash:', favoritesList.length, 'items');
-            }
-          }
-        } catch (e) {
-          console.warn('URL hash load failed:', e);
+      // Try localStorage first, then sessionStorage
+      try {
+        let savedFavorites = localStorage.getItem('crypto-favorites');
+        let loadSource = 'localStorage';
+        
+        if (!savedFavorites) {
+          savedFavorites = sessionStorage.getItem('crypto-favorites');
+          loadSource = 'sessionStorage';
         }
+        
+        if (savedFavorites) {
+          const favoritesList: string[] = JSON.parse(savedFavorites);
+          favoritesSet = new Set<string>(favoritesList);
+          console.log(`Favorites loaded from ${loadSource}:`, favoritesList.length, 'items');
+        }
+      } catch (e) {
+        console.warn('Storage load failed:', e);
       }
       
-      // 2. Fallback: Load from localStorage/sessionStorage
-      if (favoritesSet.size === 0) {
-        try {
-          let savedFavorites = localStorage.getItem('crypto-favorites');
-          loadSource = 'localStorage';
-          
-          if (!savedFavorites) {
-            savedFavorites = sessionStorage.getItem('crypto-favorites');
-            loadSource = 'sessionStorage';
-          }
-          
-          // 3. Last resort: backup storage
-          if (!savedFavorites) {
-            savedFavorites = localStorage.getItem('crypto-favorites-backup');
-            loadSource = 'backup storage';
-          }
-          
-          if (savedFavorites) {
-            const favoritesList: string[] = JSON.parse(savedFavorites);
-            favoritesSet = new Set<string>(favoritesList);
-            console.log(`Favorites loaded from ${loadSource}:`, favoritesList.length, 'items');
-            
-            // If loaded from storage but not in URL, sync to URL for future iOS persistence (only on iOS)
-            if (loadSource !== 'URL hash (iOS)' && favoritesSet.size > 0 && isIOSDevice && isInIframe) {
-              console.log('iOS: Syncing favorites to URL for persistence...');
-              // Use setTimeout to avoid setState during render
-              setTimeout(() => saveFavorites(favoritesSet), 100);
-            }
-          }
-        } catch (e) {
-          console.warn('Storage load failed:', e);
-        }
-      }
-      
-      // 4. Update state and return
+      // Update state
       if (favoritesSet.size > 0) {
         setFavorites(favoritesSet);
-        console.log(`✅ Total favorites loaded from ${loadSource}:`, favoritesSet.size);
+        console.log('✅ Total favorites loaded:', favoritesSet.size);
       }
       
       return favoritesSet;
@@ -258,85 +153,37 @@ function App() {
       console.error('Failed to load favorites:', error);
       return new Set<string>();
     }
-  }, [saveFavorites]);
+  }, []);
 
-  // Test storage functionality for debugging
+  // Simple storage test for debugging
   const testStorage = useCallback(() => {
-    console.log('=== Storage Test for Blast Mobile ===');
+    console.log('=== Storage Test ===');
     
     try {
-      // Test localStorage
-      localStorage.setItem('test-storage', 'localStorage-works');
-      const localTest = localStorage.getItem('test-storage');
-      console.log('localStorage test:', localTest === 'localStorage-works' ? '✅ WORKS' : '❌ FAILED');
-      localStorage.removeItem('test-storage');
+      localStorage.setItem('test', 'works');
+      const test = localStorage.getItem('test');
+      console.log('localStorage:', test === 'works' ? '✅ Works' : '❌ Failed');
+      localStorage.removeItem('test');
     } catch (e) {
-      console.log('localStorage test: ❌ FAILED -', e);
+      console.log('localStorage: ❌ Failed -', e);
     }
     
     try {
-      // Test sessionStorage
-      sessionStorage.setItem('test-storage', 'sessionStorage-works');
-      const sessionTest = sessionStorage.getItem('test-storage');
-      console.log('sessionStorage test:', sessionTest === 'sessionStorage-works' ? '✅ WORKS' : '❌ FAILED');
-      sessionStorage.removeItem('test-storage');
+      sessionStorage.setItem('test', 'works');
+      const test = sessionStorage.getItem('test');
+      console.log('sessionStorage:', test === 'works' ? '✅ Works' : '❌ Failed');
+      sessionStorage.removeItem('test');
     } catch (e) {
-      console.log('sessionStorage test: ❌ FAILED -', e);
+      console.log('sessionStorage: ❌ Failed -', e);
     }
     
-    // Test URL hash persistence (only test on iOS for Blast Mobile compatibility)
-    const isIOSDevice = /iPad|iPhone|iPod/.test(navigator.userAgent);
-    const isInIframe = window.location !== window.parent.location;
+    console.log('Current favorites:', Array.from(favorites));
     
-    if (isIOSDevice && isInIframe) {
-      try {
-        const testFavorites = ['bitcoin', 'ethereum'];
-        const testJson = JSON.stringify(testFavorites);
-        const encodedTest = encodeURIComponent(testJson);
-        const testHash = `#fav=${encodedTest}`;
-        
-        // Save to URL
-        window.history.replaceState(null, '', testHash);
-        
-        // Read back from URL
-        const currentHash = window.location.hash;
-        if (currentHash.includes('fav=')) {
-          const extractedEncoded = currentHash.split('fav=')[1];
-          const extractedDecoded = decodeURIComponent(extractedEncoded);
-          const extractedFavorites = JSON.parse(extractedDecoded);
-          const urlTest = JSON.stringify(extractedFavorites) === testJson;
-          console.log('URL hash persistence test (iOS):', urlTest ? '✅ WORKS' : '❌ FAILED');
-          
-          // Restore original hash
-          if (favorites.size > 0) {
-            const originalFavorites = JSON.stringify(Array.from(favorites));
-            const originalEncoded = encodeURIComponent(originalFavorites);
-            window.history.replaceState(null, '', `#fav=${originalEncoded}`);
-          } else {
-            window.history.replaceState(null, '', window.location.pathname);
-          }
-        } else {
-          console.log('URL hash persistence test (iOS): ❌ FAILED - could not set hash');
-        }
-      } catch (e) {
-        console.log('URL hash persistence test (iOS): ❌ FAILED -', e);
-      }
-    } else {
-      console.log('URL hash persistence test: ⏭️ SKIPPED (not iOS + iframe - better for Blast Mobile compatibility)');
+    const platformInfo = sessionStorage.getItem('platform-info');
+    if (platformInfo) {
+      const info = JSON.parse(platformInfo);
+      console.log('Platform info:', info);
     }
-    
-    // Test current favorites
-    const currentFavorites = Array.from(favorites);
-    console.log('Current favorites in memory:', currentFavorites);
-    
-    // iOS detection
-    const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
-    const inIframe = window.location !== window.parent.location;
-    console.log('iOS device:', isIOS ? 'YES' : 'NO');
-    console.log('In iframe:', inIframe ? 'YES' : 'NO');
-    console.log('URL persistence recommended:', (isIOS && inIframe) ? 'YES (iOS + iframe)' : 'NO (storage should work)');
-    
-    console.log('=== End Storage Test ===');
   }, [favorites]);
 
   // Expose testStorage globally for debugging in Blast Mobile
@@ -347,13 +194,11 @@ function App() {
   // Load favorites from storage on component mount
   useEffect(() => {
     loadFavorites();
-  }, [loadFavorites]);
+  }, []);
 
-  // Save favorites to storage whenever favorites change
+  // Save favorites to storage whenever favorites change (including when cleared)
   useEffect(() => {
-    if (favorites.size > 0) {
-      saveFavorites(favorites);
-    }
+    saveFavorites(favorites);
   }, [favorites, saveFavorites]);
 
   // Load missing favorites (favorites not in top 250) whenever favorites or allCryptos change
@@ -397,9 +242,6 @@ function App() {
         newFavorites.add(cryptoId);
         console.log(`Added ${cryptoId} to favorites`);
       }
-      
-      // Immediately save to storage for better persistence in iframe environments
-      saveFavorites(newFavorites);
       
       console.log('Current favorites count:', newFavorites.size);
       console.log('All favorites:', Array.from(newFavorites));
@@ -471,10 +313,10 @@ function App() {
   const scanWalletBalances = async (address: string) => {
     try {
       setIsLoadingWallet(true);
-      console.log('Scanning wallet balances for:', address);
+      console.log('Scanning wallet balances and vested positions for:', address);
       const balances = await getAllWalletBalances(address);
       setWalletBalances(balances);
-      console.log('Found wallet balances:', balances);
+      console.log('Found wallet balances and vested positions:', balances);
     } catch (error) {
       console.error('Error scanning wallet:', error);
       setWalletBalances([]);
@@ -794,6 +636,9 @@ function App() {
       case 'favorites':
         const favoriteCryptos = allCryptos.filter(crypto => favorites.has(crypto.id));
         const allFavoriteCryptos = [...favoriteCryptos, ...missingFavorites];
+        const isIOSDevice = /iPad|iPhone|iPod/.test(navigator.userAgent);
+        const isIframe = window !== window.top;
+        
         return (
           <div className="screen-content no-search">
             <div className="content-area">
@@ -806,6 +651,36 @@ function App() {
                   <p style={{ fontSize: '0.875rem', opacity: '0.8' }}>
                     Tap the star (★) next to any cryptocurrency to add it to your favorites.
                   </p>
+                  {isIOSDevice && isIframe && (
+                    <div style={{ 
+                      marginTop: '1.5rem',
+                      padding: '1rem',
+                      background: 'linear-gradient(135deg, rgba(152, 221, 40, 0.1) 0%, rgba(252, 252, 3, 0.05) 100%)',
+                      border: '2px solid rgba(152, 221, 40, 0.3)',
+                      borderRadius: '12px',
+                      fontSize: '0.85rem',
+                      color: '#98DD28',
+                      position: 'relative',
+                      overflow: 'hidden'
+                    }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.5rem' }}>
+                        <span style={{ fontSize: '1.2rem' }}>📱</span>
+                        <strong>iOS Note</strong>
+                      </div>
+                      <div style={{ lineHeight: 1.4 }}>
+                        Favorites will persist during your session but may not survive app closure due to iOS limitations.
+                      </div>
+                      <div style={{
+                        position: 'absolute',
+                        top: 0,
+                        left: 0,
+                        right: 0,
+                        height: '2px',
+                        background: 'linear-gradient(90deg, transparent, #98DD28, transparent)',
+                        opacity: 0.6
+                      }}></div>
+                    </div>
+                  )}
                 </div>
               ) : (
                 <>
@@ -813,6 +688,34 @@ function App() {
                     <h2 style={{ margin: '0', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem', color: '#FCFC03' }}>
                       ★ My Favorites ({favorites.size})
                     </h2>
+                    {isIOSDevice && isIframe && (
+                      <div style={{ 
+                        marginTop: '0.75rem',
+                        padding: '0.75rem 1rem',
+                        background: 'linear-gradient(135deg, rgba(152, 221, 40, 0.15) 0%, rgba(252, 252, 3, 0.08) 100%)',
+                        border: '1px solid rgba(152, 221, 40, 0.4)',
+                        borderRadius: '8px',
+                        fontSize: '0.8rem',
+                        color: '#98DD28',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '0.5rem',
+                        position: 'relative',
+                        overflow: 'hidden'
+                      }}>
+                        <span style={{ fontSize: '1rem' }}>📱</span>
+                        <span>iOS: Favorites saved for this session</span>
+                        <div style={{
+                          position: 'absolute',
+                          top: 0,
+                          left: 0,
+                          right: 0,
+                          height: '1px',
+                          background: 'linear-gradient(90deg, transparent, #98DD28, transparent)',
+                          opacity: 0.7
+                        }}></div>
+                      </div>
+                    )}
                   </div>
                   <div className="crypto-list">
                     {allFavoriteCryptos.map((crypto) => (
@@ -846,52 +749,147 @@ function App() {
                 <>
                   <div style={{ padding: '1rem', textAlign: 'center', borderBottom: '1px solid #404833', background: 'linear-gradient(135deg, #11140C 0%, #404833 100%)' }}>
                     <h2 style={{ margin: '0', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem', color: '#FCFC03' }}>
-                      💰 Wallet Holdings
+                      💰 Portfolio Overview
                     </h2>
                     <div style={{ marginTop: '0.5rem', fontSize: '0.875rem', opacity: '0.9' }}>
                       {walletAddress.slice(0, 6)}...{walletAddress.slice(-4)}
                     </div>
                     {isLoadingWallet && (
                       <div style={{ marginTop: '0.5rem', fontSize: '0.75rem', color: '#98DD28' }}>
-                        🔍 Scanning wallet...
+                        🔍 Scanning wallet & vested positions...
                       </div>
                     )}
                   </div>
                 
                 {walletBalances.length > 0 ? (
-                  <div className="crypto-list">
-                    {walletBalances.map((balance) => (
-                      <div key={balance.contractAddress} className="crypto-row" style={{ borderLeft: '3px solid #98DD28' }}>
-                        <div className="crypto-rank">💎</div>
-                        
-                        <div className="crypto-icon" style={{ background: balance.isNative ? 'linear-gradient(135deg, #627EEA 0%, #404833 100%)' : 'linear-gradient(135deg, #FCFC03 0%, #75835D 100%)' }}>
-                          {balance.symbol.slice(0, 2)}
-                        </div>
-                        
-                        <div className="crypto-info">
-                          <div className="crypto-name">{balance.name}</div>
-                          <div className="crypto-symbol">{balance.symbol}</div>
-                          <div style={{ fontSize: '0.75rem', color: '#98DD28', marginTop: '0.25rem' }}>
-                            Holdings: {balance.balance} {balance.symbol}
-                          </div>
-                        </div>
-                        
-                        <div className="crypto-price-section">
-                          <div className="crypto-price">
-                            {parseFloat(balance.balance).toFixed(6)}
-                          </div>
-                          <div style={{ fontSize: '0.75rem', color: '#98DD28' }}>
-                            {balance.isNative ? 'Native Token' : 'ERC-20 Token'}
-                          </div>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
+                  <>
+                    {/* Separate regular tokens from vested tokens */}
+                    {(() => {
+                      const regularTokens = walletBalances.filter(balance => !balance.isVested);
+                      const vestedTokens = walletBalances.filter(balance => balance.isVested);
+                      
+                      return (
+                        <>
+                          {/* Regular Token Holdings */}
+                          {regularTokens.length > 0 && (
+                            <>
+                              <div style={{ padding: '1rem', borderBottom: '1px solid #404833', background: 'rgba(252, 252, 3, 0.05)' }}>
+                                <h3 style={{ margin: '0', color: '#FCFC03', fontSize: '1rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                                  💎 Active Holdings ({regularTokens.length})
+                                </h3>
+                              </div>
+                              <div className="crypto-list">
+                                {regularTokens.map((balance) => (
+                                  <div key={balance.contractAddress} className="crypto-row" style={{ borderLeft: '3px solid #98DD28' }}>
+                                    <div className="crypto-rank">💎</div>
+                                    
+                                    <div className="crypto-icon" style={{ background: balance.isNative ? 'linear-gradient(135deg, #627EEA 0%, #404833 100%)' : 'linear-gradient(135deg, #FCFC03 0%, #75835D 100%)' }}>
+                                      {balance.symbol.slice(0, 2)}
+                                    </div>
+                                    
+                                    <div className="crypto-info">
+                                      <div className="crypto-name">{balance.name}</div>
+                                      <div className="crypto-symbol">{balance.symbol}</div>
+                                      <div style={{ fontSize: '0.75rem', color: '#98DD28', marginTop: '0.25rem' }}>
+                                        Holdings: {balance.balance} {balance.symbol}
+                                      </div>
+                                    </div>
+                                    
+                                    <div className="crypto-price-section">
+                                      <div className="crypto-price">
+                                        {parseFloat(balance.balance).toFixed(6)}
+                                      </div>
+                                      <div style={{ fontSize: '0.75rem', color: '#98DD28' }}>
+                                        {balance.isNative ? 'Native Token' : 'ERC-20 Token'}
+                                      </div>
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                            </>
+                          )}
+
+                          {/* Vested/Locked Token Holdings */}
+                          {vestedTokens.length > 0 && (
+                            <>
+                              <div style={{ padding: '1rem', borderBottom: '1px solid #404833', background: 'rgba(152, 221, 40, 0.1)' }}>
+                                <h3 style={{ margin: '0', color: '#98DD28', fontSize: '1rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                                  🔒 Vested & Staked Positions ({vestedTokens.length})
+                                </h3>
+                                <div style={{ fontSize: '0.8rem', color: '#9BA885', marginTop: '0.25rem' }}>
+                                  Locked tokens, staking rewards, and vesting schedules
+                                </div>
+                              </div>
+                              <div className="crypto-list">
+                                {vestedTokens.map((balance) => (
+                                  <div key={balance.contractAddress} className="crypto-row" style={{ 
+                                    borderLeft: '3px solid #FCFC03',
+                                    background: 'linear-gradient(135deg, rgba(152, 221, 40, 0.1) 0%, rgba(252, 252, 3, 0.05) 100%)'
+                                  }}>
+                                    <div className="crypto-rank" style={{ color: '#FCFC03' }}>🔒</div>
+                                    
+                                    <div className="crypto-icon" style={{ 
+                                      background: 'linear-gradient(135deg, #FCFC03 0%, #98DD28 100%)',
+                                      border: '2px solid #98DD28'
+                                    }}>
+                                      {balance.symbol.slice(0, 2)}
+                                    </div>
+                                    
+                                    <div className="crypto-info">
+                                      <div className="crypto-name" style={{ color: '#FCFC03' }}>{balance.name}</div>
+                                      <div className="crypto-symbol" style={{ color: '#98DD28' }}>{balance.symbol}</div>
+                                      <div style={{ fontSize: '0.75rem', color: '#98DD28', marginTop: '0.25rem' }}>
+                                        {balance.vestingInfo ? (
+                                          <>
+                                            Total: {balance.vestingInfo.totalAmount} | 
+                                            Claimable: {balance.vestingInfo.claimableAmount}
+                                          </>
+                                        ) : (
+                                          `Locked: ${balance.balance} ${balance.symbol}`
+                                        )}
+                                      </div>
+                                      {balance.vestingInfo && (
+                                        <div style={{ fontSize: '0.7rem', color: '#9BA885', marginTop: '0.25rem' }}>
+                                          Schedule: {balance.vestingInfo.unlockSchedule}
+                                        </div>
+                                      )}
+                                    </div>
+                                    
+                                    <div className="crypto-price-section">
+                                      <div className="crypto-price" style={{ color: '#FCFC03' }}>
+                                        {parseFloat(balance.balance).toFixed(6)}
+                                      </div>
+                                      <div style={{ fontSize: '0.75rem', color: '#98DD28' }}>
+                                        Vested/Locked
+                                      </div>
+                                      {balance.vestingInfo && balance.vestingInfo.claimableAmount !== '0.000000' && (
+                                        <div style={{ 
+                                          fontSize: '0.7rem', 
+                                          color: '#FCFC03', 
+                                          marginTop: '0.25rem',
+                                          padding: '0.25rem',
+                                          background: 'rgba(252, 252, 3, 0.2)',
+                                          borderRadius: '4px',
+                                          border: '1px solid #FCFC03'
+                                        }}>
+                                          ⚡ Claimable: {parseFloat(balance.vestingInfo.claimableAmount).toFixed(4)}
+                                        </div>
+                                      )}
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                            </>
+                          )}
+                        </>
+                      );
+                    })()}
+                  </>
                 ) : isLoadingWallet ? (
                   <LoadingSkeleton count={3} />
                 ) : (
                   <div style={{ padding: '1rem', textAlign: 'center', color: '#9BA885', fontSize: '0.875rem' }}>
-                    No token balances found or balances are too small to display
+                    No token balances or vested positions found
                   </div>
                 )}
                 </>
@@ -902,7 +900,7 @@ function App() {
                   </h2>
                   <p style={{ marginBottom: '1rem' }}>Connect your wallet to view holdings</p>
                   <p style={{ fontSize: '0.875rem', opacity: '0.8' }}>
-                    Your crypto portfolio will appear here once connected.
+                    Your crypto portfolio, including vested tokens and staking positions, will appear here once connected.
                   </p>
                 </div>
               )}

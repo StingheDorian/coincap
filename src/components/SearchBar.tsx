@@ -14,15 +14,13 @@ const SearchBar: React.FC<SearchBarProps> = ({
   isLoading = false 
 }) => {
   return (
-    <div className={`search-container ${isLoading ? 'loading' : ''}`}>
-      <input
-        type="text"
-        className="search-input"
-        placeholder={placeholder}
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-      />
-    </div>
+    <input
+      type="text"
+      className={`search-input ${isLoading ? 'loading' : ''}`}
+      placeholder={placeholder}
+      value={value}
+      onChange={(e) => onChange(e.target.value)}
+    />
   );
 };
 

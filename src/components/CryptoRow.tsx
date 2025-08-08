@@ -58,6 +58,15 @@ const CryptoRow: React.FC<CryptoRowProps> = ({ crypto, isFavorite = false, onTog
       <div className="crypto-info">
         <div className="crypto-name">{crypto.name}</div>
         <div className="crypto-symbol">{crypto.symbol}</div>
+        <div className="crypto-stats">
+          <span className="crypto-market-cap">
+            Cap: {formatCurrency(crypto.marketCapUsd, 0)}
+          </span>
+          <span className="stats-separator">•</span>
+          <span className="crypto-volume">
+            Vol: {formatCurrency(crypto.volumeUsd24Hr, 0)}
+          </span>
+        </div>
       </div>
       
       <div className="crypto-price-section">

@@ -1,4 +1,5 @@
 import { getProvider } from '../utils';
+import { getMockVestedTokens, shouldShowMockVesting } from './mockVesting';
 
 // Common ERC-20 tokens on Blast network
 const BLAST_TOKENS = {
@@ -11,6 +12,20 @@ const BLAST_TOKENS = {
   WETH: '0x4300000000000000000000000000000000000004', // Wrapped ETH
 };
 
+// Blast staking and vesting contracts
+const BLAST_VESTING_CONTRACTS = {
+  // Blast Points staking
+  BLAST_POINTS_STAKING: '0x2fc95838c71e76ec69ff817983BFf17c710F34E0',
+  
+  // Blast token vesting contracts (these are examples - you'll need actual addresses)
+  BLAST_TEAM_VESTING: '0x1234567890123456789012345678901234567890',
+  BLAST_COMMUNITY_VESTING: '0x2345678901234567890123456789012345678901',
+  
+  // Yield farming contracts
+  BLAST_ETH_YIELD: '0x4300000000000000000000000000000000000002',
+  BLAST_USDB_YIELD: '0x4300000000000000000000000000000000000001',
+};
+
 export interface WalletBalance {
   symbol: string;
   name: string;
@@ -18,6 +33,17 @@ export interface WalletBalance {
   decimals: number;
   contractAddress: string;
   isNative: boolean;
+  isVested?: boolean; // For locked/staked tokens
+  vestingInfo?: VestingInfo;
+}
+
+export interface VestingInfo {
+  totalAmount: string;
+  claimedAmount: string;
+  claimableAmount: string;
+  vestingStart: number;
+  vestingEnd: number;
+  unlockSchedule: string; // e.g., "Linear" or "Cliff + Linear"
 }
 
 /**
@@ -121,8 +147,146 @@ export async function getTokenBalance(
 }
 
 /**
- * Get all wallet balances (ETH + known tokens)
+ * Get vested/locked token information for a specific contract
  */
+export async function getVestedTokenBalance(
+  walletAddress: string,
+  contractAddress: string,
+  tokenSymbol: string,
+  tokenName: string
+): Promise<WalletBalance | null> {
+  try {
+    const provider = await getProvider();
+    if (!provider) return null;
+
+    // Standard vesting contract function signatures
+    const getCurrentBalanceSelector = '0x70a08231'; // balanceOf(address)
+    const getTotalVestedSelector = '0x6fb32c4b'; // Common vesting contract method
+    const getClaimableSelector = '0x402914f5'; // Common claimable amount method
+
+    // Get current balance in vesting contract
+    const balanceData = await provider.request({
+      method: 'eth_call',
+      params: [{
+        to: contractAddress,
+        data: getCurrentBalanceSelector + walletAddress.slice(2).padStart(64, '0')
+      }, 'latest']
+    });
+
+    const balance = BigInt(balanceData || '0x0');
+    
+    if (balance === BigInt(0)) {
+      return null; // No vested tokens
+    }
+
+    // Try to get additional vesting info (may fail if contract doesn't support these methods)
+    let vestingInfo: VestingInfo | undefined;
+    
+    try {
+      // Attempt to get total vested amount
+      const totalVestedData = await provider.request({
+        method: 'eth_call',
+        params: [{
+          to: contractAddress,
+          data: getTotalVestedSelector + walletAddress.slice(2).padStart(64, '0')
+        }, 'latest']
+      });
+      
+      // Attempt to get claimable amount
+      const claimableData = await provider.request({
+        method: 'eth_call',
+        params: [{
+          to: contractAddress,
+          data: getClaimableSelector + walletAddress.slice(2).padStart(64, '0')
+        }, 'latest']
+      });
+
+      const totalVested = BigInt(totalVestedData || '0x0');
+      const claimable = BigInt(claimableData || '0x0');
+      const claimed = totalVested - balance;
+
+      vestingInfo = {
+        totalAmount: (Number(totalVested) / Math.pow(10, 18)).toFixed(6),
+        claimedAmount: (Number(claimed) / Math.pow(10, 18)).toFixed(6),
+        claimableAmount: (Number(claimable) / Math.pow(10, 18)).toFixed(6),
+        vestingStart: 0, // Would need contract-specific logic
+        vestingEnd: 0, // Would need contract-specific logic
+        unlockSchedule: 'Linear' // Default assumption
+      };
+    } catch (e) {
+      console.warn('Could not fetch detailed vesting info for', contractAddress);
+    }
+
+    const balanceInToken = Number(balance) / Math.pow(10, 18); // Assume 18 decimals for most tokens
+
+    return {
+      symbol: tokenSymbol,
+      name: tokenName,
+      balance: balanceInToken.toFixed(6),
+      decimals: 18,
+      contractAddress,
+      isNative: false,
+      isVested: true,
+      vestingInfo
+    };
+  } catch (error) {
+    console.error('Error getting vested token balance:', error);
+    return null;
+  }
+}
+
+/**
+ * Get Blast Points balance (special case for Blast ecosystem)
+ */
+export async function getBlastPointsBalance(walletAddress: string): Promise<WalletBalance | null> {
+  try {
+    const provider = await getProvider();
+    if (!provider) return null;
+
+    // Blast Points are tracked differently - this is a simplified example
+    // In reality, you'd need to call the actual Blast Points API or contract
+    
+    // For demonstration, let's check if the user has any Blast Points staked
+    const pointsStakingContract = BLAST_VESTING_CONTRACTS.BLAST_POINTS_STAKING;
+    
+    const balanceData = await provider.request({
+      method: 'eth_call',
+      params: [{
+        to: pointsStakingContract,
+        data: '0x70a08231' + walletAddress.slice(2).padStart(64, '0') // balanceOf
+      }, 'latest']
+    });
+
+    const balance = BigInt(balanceData || '0x0');
+    
+    if (balance === BigInt(0)) {
+      return null;
+    }
+
+    const balanceInPoints = Number(balance) / Math.pow(10, 18);
+
+    return {
+      symbol: 'BLAST PTS',
+      name: 'Blast Points (Staked)',
+      balance: balanceInPoints.toFixed(0), // Points are usually whole numbers
+      decimals: 18,
+      contractAddress: pointsStakingContract,
+      isNative: false,
+      isVested: true,
+      vestingInfo: {
+        totalAmount: balanceInPoints.toFixed(0),
+        claimedAmount: '0',
+        claimableAmount: balanceInPoints.toFixed(0),
+        vestingStart: Date.now() - 86400000, // Example: started yesterday
+        vestingEnd: Date.now() + 86400000 * 30, // Example: ends in 30 days
+        unlockSchedule: 'Continuous'
+      }
+    };
+  } catch (error) {
+    console.error('Error getting Blast Points balance:', error);
+    return null;
+  }
+}
 export async function getAllWalletBalances(walletAddress: string): Promise<WalletBalance[]> {
   const balances: WalletBalance[] = [];
 
@@ -148,6 +312,32 @@ export async function getAllWalletBalances(walletAddress: string): Promise<Walle
     tokenBalances.forEach(balance => {
       if (balance) balances.push(balance);
     });
+
+    // Get vested/staked token balances
+    const vestingPromises = [
+      // Check for Blast Points
+      getBlastPointsBalance(walletAddress),
+      
+      // Check for vested BLAST tokens
+      getVestedTokenBalance(walletAddress, BLAST_VESTING_CONTRACTS.BLAST_TEAM_VESTING, 'vBLAST', 'Vested BLAST (Team)'),
+      getVestedTokenBalance(walletAddress, BLAST_VESTING_CONTRACTS.BLAST_COMMUNITY_VESTING, 'vBLAST', 'Vested BLAST (Community)'),
+      
+      // Check for yield farming positions
+      getVestedTokenBalance(walletAddress, BLAST_VESTING_CONTRACTS.BLAST_ETH_YIELD, 'yETH', 'Yield ETH Position'),
+      getVestedTokenBalance(walletAddress, BLAST_VESTING_CONTRACTS.BLAST_USDB_YIELD, 'yUSDB', 'Yield USDB Position'),
+    ];
+
+    const vestingBalances = await Promise.all(vestingPromises);
+    vestingBalances.forEach(balance => {
+      if (balance) balances.push(balance);
+    });
+
+    // Add mock vesting data for demonstration in development
+    if (shouldShowMockVesting(walletAddress)) {
+      const mockVesting = getMockVestedTokens(walletAddress);
+      balances.push(...mockVesting);
+      console.log('Added mock vesting data for demonstration:', mockVesting.length, 'positions');
+    }
 
   } catch (error) {
     console.error('Error getting wallet balances:', error);
