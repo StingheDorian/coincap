@@ -206,7 +206,6 @@ function App() {
   useEffect(() => {
     const loadMissingFavorites = async () => {
       if (favorites.size === 0 || allCryptos.length === 0) {
-        console.log('🔍 FAVORITES: No favorites or allCryptos to check, clearing missing favorites');
         setMissingFavorites([]);
         return;
       }
@@ -215,26 +214,17 @@ function App() {
       const currentCryptoIds = new Set(allCryptos.map(crypto => crypto.id));
       const missingFavoriteIds = Array.from(favorites).filter(id => !currentCryptoIds.has(id));
 
-      console.log('🔍 FAVORITES: Analysis', {
-        totalFavorites: favorites.size,
-        allCryptosCount: allCryptos.length,
-        currentCryptoIds: Array.from(currentCryptoIds).slice(0, 10), // First 10 for debugging
-        allFavoriteIds: Array.from(favorites),
-        missingFavoriteIds
-      });
-
       if (missingFavoriteIds.length > 0) {
-        console.log(`🔍 FAVORITES: Loading ${missingFavoriteIds.length} missing favorites:`, missingFavoriteIds);
+        console.log(`Loading ${missingFavoriteIds.length} missing favorites:`, missingFavoriteIds);
         try {
           const missing = await fetchMissingFavorites(missingFavoriteIds, allCryptos);
           setMissingFavorites(missing);
-          console.log(`✅ FAVORITES: Successfully loaded ${missing.length} missing favorites`, missing.map(m => `${m.name} (${m.id})`));
+          console.log(`Successfully loaded ${missing.length} missing favorites`);
         } catch (error) {
-          console.error('❌ FAVORITES: Failed to load missing favorites:', error);
+          console.error('Failed to load missing favorites:', error);
           setMissingFavorites([]);
         }
       } else {
-        console.log('✅ FAVORITES: All favorites are in current dataset, no missing favorites to load');
         setMissingFavorites([]);
       }
     };
@@ -667,15 +657,6 @@ function App() {
         const allFavoriteCryptos = [...favoriteCryptos, ...missingFavorites];
         const isIOSDevice = /iPad|iPhone|iPod/.test(navigator.userAgent);
         const isIframe = window !== window.top;
-        
-        // Debug logging for favorites display
-        console.log('🎯 FAVORITES DISPLAY:', {
-          favoritesSet: Array.from(favorites),
-          favoriteCryptos: favoriteCryptos.map(c => `${c.name} (${c.id})`),
-          missingFavorites: missingFavorites.map(c => `${c.name} (${c.id})`),
-          allFavoriteCryptos: allFavoriteCryptos.map(c => `${c.name} (${c.id})`),
-          allCryptosCount: allCryptos.length
-        });
         
         return (
           <div className="screen-content no-search">
