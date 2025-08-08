@@ -261,160 +261,14 @@ export async function getVestedTokenBalance(
  * Scan for potential staking positions across multiple possible contracts
  * This is a more aggressive scan for any contracts holding user tokens
  */
-export async function scanForStakingPositions(walletAddress: string): Promise<WalletBalance[]> {
-  const stakingPositions: WalletBalance[] = [];
-  
-  console.log('🔍 STAKING SCAN: Starting comprehensive staking scan for wallet:', walletAddress);
-  
-  try {
-    const provider = await getProvider();
-    if (!provider) {
-      console.log('❌ STAKING SCAN: No provider available');
-      return stakingPositions;
-    }
-    
-    console.log('✅ STAKING SCAN: Provider connected, scanning contracts...');
-
-    // Known staking/deposit contract patterns on Blast
-    const possibleStakingContracts = [
-      // Blast native staking possibilities
-      '0x4300000000000000000000000000000000000001', // Blast system contract
-      '0x4300000000000000000000000000000000000002', // Blast yield contract (ETH)
-      '0x4300000000000000000000000000000000000003', // USDB system contract  
-      '0x4300000000000000000000000000000000000004', // WETH system contract
-      
-      // Blast Points and staking contracts
-      '0x2fc95838c71e76ec69ff817983BFf17c710F34E0', // Blast Points staking
-      '0x3fc95838c71e76ec69ff817983BFf17c710F34E1', // Alternative Blast contract
-      
-      // Common DeFi staking pool patterns (these are generic examples)
-      '0xA230285d5683C74935aD14c446e137c8c8828438', // Example staking pool
-      '0xB230285d5683C74935aD14c446e137c8c8828439', // Example USDB pool
-      '0xC230285d5683C74935aD14c446e137c8c882843A', // Example yield farm
-      '0xD230285d5683C74935aD14c446e137c8c882843B', // Example liquidity mining
-      
-      // Blast Mobile specific contracts (these might be different)
-      '0x1000000000000000000000000000000000000001', // Potential Blast Mobile staking
-      '0x2000000000000000000000000000000000000001', // Potential Blast Mobile yield
-      '0x5000000000000000000000000000000000000001', // Potential Earn App contract
-      '0x6000000000000000000000000000000000000001', // Potential reward contract
-      
-      // Additional scanning - let's also check the token contracts themselves
-      BLAST_TOKENS.BLAST, // BLAST token contract might track staked balances
-      BLAST_TOKENS.USDB,  // USDB contract might track yield positions
-      BLAST_TOKENS.WETH,  // WETH contract might have staking
-    ];
-
-    // Check each contract for user deposits
-    console.log(`🔍 STAKING SCAN: Checking ${possibleStakingContracts.length} potential staking contracts...`);
-    
-    const contractPromises = possibleStakingContracts.map(async (contractAddress, index) => {
-      console.log(`🔍 STAKING SCAN: [${index + 1}/${possibleStakingContracts.length}] Checking contract: ${contractAddress}`);
-      
-      try {
-        // Try different method signatures for staking/deposit contracts
-        const methods = [
-          '0x70a08231', // balanceOf(address) - most common
-          '0x18160ddd', // totalSupply() - might show staked amount
-          '0xf7c618c1', // earned(address) - rewards earned
-          '0x3d18b912', // getReward() - claimable rewards
-          '0xe3161dae', // stakingBalance(address) - specific staking balance
-        ];
-
-        for (const methodSig of methods) {
-          try {
-            console.log(`🔍 STAKING SCAN: Trying method ${methodSig} on contract ${contractAddress}`);
-            const data = await provider.request({
-              method: 'eth_call',
-              params: [{
-                to: contractAddress,
-                data: methodSig + walletAddress.slice(2).padStart(64, '0')
-              }, 'latest']
-            });
-
-            const balance = BigInt(data || '0x0');
-            console.log(`📊 STAKING SCAN: Contract ${contractAddress} method ${methodSig} returned balance: ${balance.toString()}`);
-            
-            if (balance > BigInt(0)) {
-              const balanceInToken = Number(balance) / Math.pow(10, 18);
-              console.log(`🎯 STAKING SCAN: Found non-zero balance! ${balanceInToken} tokens in contract ${contractAddress}`);
-              
-              // Only include meaningful balances
-              if (balanceInToken > 0.000001) {
-                console.log(`✅ STAKING SCAN: Balance is significant enough to include (${balanceInToken})`);
-                
-                // Try to determine token type from contract address
-                let tokenSymbol = 'UNKNOWN';
-                let tokenName = 'Unknown Staked Token';
-                
-                if (contractAddress.includes('4300000000000000000000000000000000000001')) {
-                  tokenSymbol = 'sBLAST';
-                  tokenName = 'Staked BLAST';
-                } else if (contractAddress.includes('4300000000000000000000000000000000000003')) {
-                  tokenSymbol = 'sUSDB';
-                  tokenName = 'Staked USDB';
-                } else if (contractAddress.includes('2fc95838c71e76ec69ff817983BFf17c710F34E0')) {
-                  tokenSymbol = 'BLAST PTS';
-                  tokenName = 'Blast Points (Staked)';
-                } else {
-                  tokenSymbol = `STAKED-${contractAddress.slice(0, 6)}`;
-                  tokenName = `Staked Position (${contractAddress.slice(0, 8)}...)`;
-                }
-
-                console.log(`🚀 STAKING SCAN: Creating staking position entry for ${tokenSymbol} (${tokenName}) with balance ${balanceInToken}`);
-
-                return {
-                  symbol: tokenSymbol,
-                  name: tokenName,
-                  balance: balanceInToken.toFixed(6),
-                  decimals: 18,
-                  contractAddress,
-                  isNative: false,
-                  isVested: true,
-                  vestingInfo: {
-                    totalAmount: balanceInToken.toFixed(6),
-                    claimedAmount: '0',
-                    claimableAmount: balanceInToken.toFixed(6),
-                    vestingStart: Date.now() - 86400000,
-                    vestingEnd: Date.now() + 86400000 * 365,
-                    unlockSchedule: 'Stakeable (method: ' + methodSig + ')'
-                  }
-                };
-              }
-            }
-          } catch (methodError) {
-            console.log(`⚠️ STAKING SCAN: Method ${methodSig} failed on contract ${contractAddress}:`, methodError);
-            // Method not supported by this contract, continue
-            continue;
-          }
-        }
-      } catch (contractError) {
-        console.log(`❌ STAKING SCAN: Contract ${contractAddress} failed completely:`, contractError);
-        // Contract doesn't exist or other error, continue
-        return null;
-      }
-      
-      console.log(`🔍 STAKING SCAN: No balance found in contract ${contractAddress}`);
-      return null;
-    });
-
-    console.log(`⏳ STAKING SCAN: Waiting for all ${contractPromises.length} contract checks to complete...`);
-    const results = await Promise.all(contractPromises);
-    
-    results.forEach((result, index) => {
-      if (result) {
-        console.log(`✅ STAKING SCAN: Adding position from contract check ${index}:`, result);
-        stakingPositions.push(result);
-      }
-    });
-
-    console.log(`🎯 STAKING SCAN: FINAL RESULT - Found ${stakingPositions.length} staking positions total!`);
-    
-  } catch (error) {
-    console.error('Error scanning for staking positions:', error);
-  }
-
-  return stakingPositions;
+/**
+ * Placeholder for future Blast Mobile staking integration
+ * TODO: Implement proper Blast Mobile API integration for real staking positions
+ */
+export async function scanForStakingPositions(_walletAddress: string): Promise<WalletBalance[]> {
+  // Remove fake staking detection - this was creating fake "weird staked amounts"
+  console.log('🔍 STAKING: Skipping generic contract scanning - need Blast Mobile API integration');
+  return [];
 }
 
 /**
@@ -567,26 +421,10 @@ export async function getAllWalletBalances(walletAddress: string): Promise<Walle
       if (balance) balances.push(balance);
     });
 
-    // Get vested/staked token balances
+    // For now, only check for Blast Points - remove other fake staking detection
     const vestingPromises = [
-      // Check for Blast Points
+      // Only check for Blast Points (this might be real)
       getBlastPointsBalance(walletAddress),
-      
-      // Check for vested BLAST tokens
-      getVestedTokenBalance(walletAddress, BLAST_VESTING_CONTRACTS.BLAST_TEAM_VESTING, 'vBLAST', 'Vested BLAST (Team)'),
-      getVestedTokenBalance(walletAddress, BLAST_VESTING_CONTRACTS.BLAST_COMMUNITY_VESTING, 'vBLAST', 'Vested BLAST (Community)'),
-      
-      // Check for yield farming positions
-      getVestedTokenBalance(walletAddress, BLAST_VESTING_CONTRACTS.BLAST_ETH_YIELD, 'yETH', 'Yield ETH Position'),
-      getVestedTokenBalance(walletAddress, BLAST_VESTING_CONTRACTS.BLAST_USDB_YIELD, 'yUSDB', 'Yield USDB Position'),
-      
-      // Check for staked tokens in official Blast staking contracts
-      getStakedTokenBalance(walletAddress, BLAST_STAKING_CONTRACTS.BLAST_POINTS_STAKING, 'BLAST', 'Staked BLAST'),
-      getStakedTokenBalance(walletAddress, BLAST_TOKENS.USDB, 'USDB', 'Staked USDB'),
-      getStakedTokenBalance(walletAddress, BLAST_STAKING_CONTRACTS.ETH_YIELD_MANAGER, 'ETH', 'ETH Yield Position'),
-      getStakedTokenBalance(walletAddress, BLAST_STAKING_CONTRACTS.USD_YIELD_MANAGER, 'USDB', 'USDB Yield Position'),
-      getStakedTokenBalance(walletAddress, BLAST_STAKING_CONTRACTS.L2_BLAST_BRIDGE, 'BLAST', 'BLAST Bridge Position'),
-      getStakedTokenBalance(walletAddress, BLAST_STAKING_CONTRACTS.LIDO_YIELD_PROVIDER, 'ETH', 'Lido Staking Position'),
     ];
 
     const vestingBalances = await Promise.all(vestingPromises);
@@ -594,24 +432,9 @@ export async function getAllWalletBalances(walletAddress: string): Promise<Walle
       if (balance) balances.push(balance);
     });
 
-    // Scan for additional staking positions (more aggressive detection)
-    try {
-      console.log('🚀 WALLET: Starting staking position scan...');
-      const stakingPositions = await scanForStakingPositions(walletAddress);
-      stakingPositions.forEach(position => {
-        // Avoid duplicates - check if we already have this contract address
-        const exists = balances.some(b => b.contractAddress === position.contractAddress);
-        if (!exists) {
-          console.log('✅ WALLET: Adding new staking position to portfolio:', position);
-          balances.push(position);
-        } else {
-          console.log('⚠️ WALLET: Skipping duplicate staking position:', position.contractAddress);
-        }
-      });
-      console.log(`🎯 WALLET: Added ${stakingPositions.length} staking positions to portfolio`);
-    } catch (error) {
-      console.error('❌ WALLET: Error scanning for staking positions:', error);
-    }
+    // For now, remove fake staking detection - we need proper Blast Mobile API integration
+    // TODO: Implement proper Blast Mobile staking/yield API integration
+    console.log('🔍 WALLET: Skipping generic staking scan - requires proper Blast Mobile API integration');
 
     // Add mock vesting data for demonstration in development
     if (shouldShowMockVesting(walletAddress)) {
