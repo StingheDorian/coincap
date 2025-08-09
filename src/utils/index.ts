@@ -58,9 +58,9 @@ export async function autoConnectWallet(): Promise<string[] | null> {
         
         // Blast Mainnet: 0x13e31 (81457), Blast Sepolia: 0xa0c71fd (168587663)
         if (chainId === '0x13e31' || chainId === '0xa0c71fd') {
-          console.log('✅ Connected to Blast network');
+          console.log('Connected to Blast network');
         } else {
-          console.log('⚠️ Not on Blast network, chain ID:', chainId);
+          console.log('Not on Blast network, chain ID:', chainId);
         }
       } catch (error) {
         console.log('Could not verify chain ID:', error);

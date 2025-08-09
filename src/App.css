@@ -80,7 +80,7 @@ body.iframe-mode .app {
 .header {
   background: linear-gradient(135deg, #11140C 0%, #404833 100%); /* Blast Camo Gradient */
   color: #FCFC03; /* Blast Yellow */
-  padding: 1rem; /* Increased padding for better mobile UX */
+  padding: 1.5rem 1rem; /* Increased vertical padding for much larger title */
   text-align: center;
   box-shadow: 0 4px 16px rgba(0,0,0,0.3); /* Enhanced shadow */
   position: fixed; /* Fixed position to prevent movement */
@@ -89,7 +89,7 @@ body.iframe-mode .app {
   right: 0;
   width: 100%;
   z-index: 100; /* High z-index to stay above everything */
-  min-height: 50px; /* Reduced header height */
+  min-height: 75px; /* Much larger header height for bigger title */
   display: flex;
   flex-direction: row; /* Changed to row for horizontal layout */
   justify-content: space-between; /* Space between title and button */
@@ -97,6 +97,8 @@ body.iframe-mode .app {
   box-sizing: border-box;
   backdrop-filter: blur(8px); /* Glass effect for modern look */
   border-bottom: 2px solid rgba(252, 252, 3, 0.2); /* Subtle border */
+  border-bottom-left-radius: 16px; /* Rounded bottom corners like buttons */
+  border-bottom-right-radius: 16px; /* Rounded bottom corners like buttons */
 }
 
 /* Iframe-specific header positioning */
@@ -107,16 +109,74 @@ body.iframe-mode .header {
 
 .header h1 {
   font-family: 'Chakra Petch', sans-serif;
-  font-weight: 600;
-  font-size: 1.4rem; /* Slightly larger for better readability */
+  font-weight: 800; /* Extra bold for impact */
+  font-size: 2.4rem; /* Much larger size - really prominent */
   margin: 0; /* Remove margin */
   flex: 1; /* Take up available space */
   text-align: center; /* Center the title */
-  background: linear-gradient(135deg, #FCFC03 0%, #98DD28 100%);
+  background: linear-gradient(45deg, #FCFC03 0%, #FFD700 25%, #98DD28 50%, #FFD700 75%, #FCFC03 100%); /* Vibrant multi-color gradient */
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
-  text-shadow: 0 2px 4px rgba(0,0,0,0.3);
+  background-size: 300% 300%; /* For animated gradient */
+  filter: drop-shadow(0 0 15px rgba(252, 252, 3, 0.8)) drop-shadow(0 0 25px rgba(152, 221, 40, 0.4)) drop-shadow(0 4px 8px rgba(0,0,0,0.6)); /* Multi-layer glow */
+  letter-spacing: 1px; /* More letter spacing for premium look */
+  text-transform: uppercase; /* Make it bold and impactful */
+  animation: titleGlow 3s ease-in-out infinite alternate, gradientShift 4s ease-in-out infinite; /* Multiple animations */
+}
+
+/* Enhanced glowing animation for the title */
+@keyframes titleGlow {
+  0% {
+    filter: drop-shadow(0 0 15px rgba(252, 252, 3, 0.8)) drop-shadow(0 0 25px rgba(152, 221, 40, 0.4)) drop-shadow(0 4px 8px rgba(0,0,0,0.6));
+  }
+  100% {
+    filter: drop-shadow(0 0 20px rgba(252, 252, 3, 1)) drop-shadow(0 0 35px rgba(152, 221, 40, 0.6)) drop-shadow(0 6px 12px rgba(0,0,0,0.8));
+  }
+}
+
+/* Animated gradient shift for super cool effect */
+@keyframes gradientShift {
+  0% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+  100% {
+    background-position: 0% 50%;
+  }
+}
+
+/* Mobile responsive adjustments for header title */
+@media (max-width: 768px) {
+  .header h1 {
+    font-size: 2.1rem; /* Still large on tablets */
+    letter-spacing: 0.8px; /* Adjusted letter spacing for mobile */
+  }
+  
+  .header {
+    padding: 1.3rem 0.8rem; /* Adjusted padding for mobile */
+    min-height: 70px; /* Adjusted height for mobile */
+  }
+}
+
+@media (max-width: 480px) {
+  .header h1 {
+    font-size: 1.9rem; /* Large but fits on small screens */
+    letter-spacing: 0.6px;
+  }
+  
+  .header {
+    min-height: 65px; /* Compact for small screens */
+    padding: 1.2rem 0.8rem;
+  }
+  
+  .refresh-button {
+    width: 44px; /* Smaller button on very small screens */
+    height: 44px;
+    font-size: 1.2rem;
+  }
 }
 
 .refresh-button {
@@ -229,7 +289,7 @@ body.iframe-mode .search-container {
 /* Content Area */
 .content {
   flex: 1;
-  margin-top: 80px; /* Adjusted for reduced header height */
+  margin-top: 95px; /* Increased for larger header height (75px + padding) */
   margin-bottom: 85px; /* Space for bottom nav */
   width: 100%;
   max-width: 100vw;
@@ -240,20 +300,20 @@ body.iframe-mode .search-container {
 
 /* Iframe-specific content positioning */
 body.iframe-mode .content {
-  margin-top: 170px !important; /* Force proper spacing with !important */
-  min-height: calc(100vh - 255px);
+  margin-top: 185px !important; /* Increased for larger header in iframe */
+  min-height: calc(100vh - 270px);
 }
 
 /* Adjust content spacing for screens without search bar */
 .content .screen-content.no-search {
   margin-top: -80px; /* Remove the extra header space since no search bar */
-  padding-top: 50px; /* Just enough space for the header */
+  padding-top: 75px; /* Increased space for the larger header */
 }
 
 /* Iframe-specific adjustments for no-search screens */
 body.iframe-mode .content .screen-content.no-search {
   margin-top: -170px !important; /* Remove iframe extra space */
-  padding-top: 95px !important; /* Just enough space for iframe header */
+  padding-top: 120px !important; /* Increased space for iframe with larger header */
 }
 
 /* Crypto List - Row Layout */
@@ -328,7 +388,8 @@ body.iframe-mode .content .screen-content.no-search {
   box-sizing: border-box; /* Include padding in width calculation */
   overflow: hidden; /* Prevent content overflow */
   position: relative;
-  margin: 0; /* Remove any potential margin */
+  margin: 0 0 8px 0; /* Add spacing between crypto cards */
+  border-radius: 8px; /* Subtle rounded corners for each card */
 }
 
 .crypto-row::before {
@@ -359,6 +420,7 @@ body.iframe-mode .content .screen-content.no-search {
 
 .crypto-row:last-child {
   border-bottom: none;
+  margin-bottom: 0; /* Remove bottom margin from last card */
 }
 
 .crypto-rank {

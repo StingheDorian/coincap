@@ -246,7 +246,7 @@ export async function getVestedTokenBalance(
  */
 export async function scanForStakingPositions(_walletAddress: string): Promise<WalletBalance[]> {
   // Remove fake staking detection - this was creating fake "weird staked amounts"
-  console.log('🔍 STAKING: Skipping generic contract scanning - need Blast Mobile API integration');
+  console.log('STAKING: Skipping generic contract scanning - need Blast Mobile API integration');
   return [];
 }
 
@@ -378,7 +378,7 @@ export async function getAllWalletBalances(walletAddress: string): Promise<Walle
   const balances: WalletBalance[] = [];
 
   try {
-    console.log('🔍 WALLET: Starting comprehensive balance scan for', walletAddress);
+    console.log('WALLET: Starting comprehensive balance scan for', walletAddress);
     
     // Get ETH balance
     const ethBalance = await getETHBalance(walletAddress);
@@ -403,11 +403,11 @@ export async function getAllWalletBalances(walletAddress: string): Promise<Walle
     });
 
     // Get REAL Blast Mobile staking and vesting positions
-    console.log('🚀 BLAST: Fetching real staking/vesting positions...');
+    console.log('BLAST: Fetching real staking/vesting positions...');
     try {
       const blastStakingPositions = await getAllBlastStakingPositions(walletAddress);
       if (blastStakingPositions.length > 0) {
-        console.log('✅ BLAST: Found', blastStakingPositions.length, 'real staking/vesting positions');
+        console.log('BLAST: Found', blastStakingPositions.length, 'real staking/vesting positions');
         balances.push(...blastStakingPositions);
       } else {
         console.log('📊 BLAST: No real staking/vesting positions found');

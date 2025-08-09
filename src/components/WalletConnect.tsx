@@ -35,13 +35,13 @@ const WalletConnect: React.FC<WalletConnectProps> = ({ onWalletChange }) => {
   };
 
   if (isConnecting) {
-    return <div className="wallet-status">🔗 Connecting...</div>;
+    return <div className="wallet-status">Connecting...</div>;
   }
 
   if (walletAddress) {
     return (
       <div className="wallet-status" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-        <span>🟢 {formatAddress(walletAddress)}</span>
+        <span>Connected: {formatAddress(walletAddress)}</span>
         <button 
           onClick={handleDisconnectWallet}
           style={{ 

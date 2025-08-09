@@ -6,6 +6,7 @@ import LoadingSkeleton from './components/LoadingSkeleton';
 import WalletConnect from './components/WalletConnect';
 import SearchBar from './components/SearchBar';
 import { fetchTopCryptocurrencies, searchCryptocurrencies, fetchMissingFavorites } from './services/api';
+import { favoritesStorage } from './services/storage';
 import { autoConnectWallet } from './utils';
 import { getAllWalletBalances, type WalletBalance } from './services/wallet';
 import { autoConnectBlastWallet as connectBlastMobile, isBlastMobileEnvironment } from './services/blastMobile';
@@ -82,7 +83,7 @@ function App() {
 
     // Show iOS storage limitation notice
     if (isIOSDevice && isBlastEnv) {
-      console.log('📱 iOS + Blast Mobile: Favorites will persist during your session but may not survive app closure due to iOS limitations');
+      console.log('iOS + Blast Mobile: Favorites will persist during your session but may not survive app closure due to iOS limitations');
       
       // Store the platform info for potential user messaging
       sessionStorage.setItem('platform-info', JSON.stringify({
@@ -95,95 +96,65 @@ function App() {
 
 
 
-  // Simple storage function that works reliably across platforms
-  const saveFavorites = useCallback((favoritesSet: Set<string>) => {
+  // Initialize robust storage system on app start
+  useEffect(() => {
+    const initStorage = async () => {
+      try {
+        await favoritesStorage.init();
+        console.log('Robust storage system initialized');
+        
+        // Test storage systems in debug mode
+        if (window.location.hostname === 'localhost') {
+          await favoritesStorage.testStorage();
+        }
+        
+        // Load favorites after storage is ready
+        const savedFavorites = await favoritesStorage.loadFavorites();
+        if (savedFavorites.length > 0) {
+          setFavorites(new Set(savedFavorites));
+          console.log('Loaded favorites:', savedFavorites.length, 'items');
+        }
+      } catch (error) {
+        console.error('Storage initialization failed:', error);
+      }
+    };
+
+    initStorage();
+  }, []);
+
+  // Robust storage function that works in iOS iframe environments
+  const saveFavorites = useCallback(async (favoritesSet: Set<string>) => {
     try {
       const favoritesArray = Array.from(favoritesSet);
-      const favoritesJson = JSON.stringify(favoritesArray);
-      
-      // Try localStorage first, fall back to sessionStorage
-      try {
-        localStorage.setItem('crypto-favorites', favoritesJson);
-        console.log('Favorites saved:', favoritesArray.length, 'items');
-      } catch (e) {
-        console.warn('localStorage failed, using sessionStorage:', e);
-        try {
-          sessionStorage.setItem('crypto-favorites', favoritesJson);
-          console.log('Favorites saved to session storage:', favoritesArray.length, 'items');
-        } catch (e2) {
-          console.warn('Both storage methods failed:', e2);
-        }
-      }
-      
+      await favoritesStorage.saveFavorites(favoritesArray);
+      console.log('Favorites saved successfully:', favoritesArray.length, 'items');
     } catch (error) {
       console.error('Failed to save favorites:', error);
     }
   }, []);
 
-  const loadFavorites = useCallback(() => {
+  // Enhanced storage test for debugging
+  const testStorage = useCallback(async () => {
+    console.log('=== Enhanced Storage Test ===');
+    
     try {
-      let favoritesSet = new Set<string>();
-      
-      // Try localStorage first, then sessionStorage
-      try {
-        let savedFavorites = localStorage.getItem('crypto-favorites');
-        let loadSource = 'localStorage';
-        
-        if (!savedFavorites) {
-          savedFavorites = sessionStorage.getItem('crypto-favorites');
-          loadSource = 'sessionStorage';
-        }
-        
-        if (savedFavorites) {
-          const favoritesList: string[] = JSON.parse(savedFavorites);
-          favoritesSet = new Set<string>(favoritesList);
-          console.log(`Favorites loaded from ${loadSource}:`, favoritesList.length, 'items');
-        }
-      } catch (e) {
-        console.warn('Storage load failed:', e);
-      }
-      
-      // Update state
-      if (favoritesSet.size > 0) {
-        setFavorites(favoritesSet);
-        console.log('✅ Total favorites loaded:', favoritesSet.size);
-      }
-      
-      return favoritesSet;
+      await favoritesStorage.testStorage();
+      const status = favoritesStorage.getStorageStatus();
+      console.log('Storage Status:', status);
     } catch (error) {
-      console.error('Failed to load favorites:', error);
-      return new Set<string>();
-    }
-  }, []);
-
-  // Simple storage test for debugging
-  const testStorage = useCallback(() => {
-    console.log('=== Storage Test ===');
-    
-    try {
-      localStorage.setItem('test', 'works');
-      const test = localStorage.getItem('test');
-      console.log('localStorage:', test === 'works' ? '✅ Works' : '❌ Failed');
-      localStorage.removeItem('test');
-    } catch (e) {
-      console.log('localStorage: ❌ Failed -', e);
-    }
-    
-    try {
-      sessionStorage.setItem('test', 'works');
-      const test = sessionStorage.getItem('test');
-      console.log('sessionStorage:', test === 'works' ? '✅ Works' : '❌ Failed');
-      sessionStorage.removeItem('test');
-    } catch (e) {
-      console.log('sessionStorage: ❌ Failed -', e);
+      console.error('Storage test failed:', error);
     }
     
     console.log('Current favorites:', Array.from(favorites));
     
-    const platformInfo = sessionStorage.getItem('platform-info');
-    if (platformInfo) {
-      const info = JSON.parse(platformInfo);
-      console.log('Platform info:', info);
+    try {
+      const platformInfo = sessionStorage.getItem('platform-info');
+      if (platformInfo) {
+        const info = JSON.parse(platformInfo);
+        console.log('Platform info:', info);
+      }
+    } catch (e) {
+      console.log('Platform info access failed:', e);
     }
   }, [favorites]);
 
@@ -192,14 +163,12 @@ function App() {
     (window as any).testCryptoStorage = testStorage;
   }, [testStorage]);
 
-  // Load favorites from storage on component mount
-  useEffect(() => {
-    loadFavorites();
-  }, []);
-
   // Save favorites to storage whenever favorites change (including when cleared)
   useEffect(() => {
-    saveFavorites(favorites);
+    // Don't save on initial load (when favorites is empty)
+    if (favorites.size > 0) {
+      saveFavorites(favorites);
+    }
   }, [favorites, saveFavorites]);
 
   // Load missing favorites (favorites not in top 250) whenever favorites or allCryptos change
@@ -278,19 +247,19 @@ function App() {
 
   const autoConnectBlastWallet = async () => {
     try {
-      console.log('🚀 BLAST: Starting Blast Mobile auto-connect...');
+      console.log('BLAST: Starting Blast Mobile auto-connect...');
       
       // Try Blast Mobile auto-connect first
       let connectedAccount = null;
       
       if (isBlastMobileEnvironment()) {
-        console.log('📱 BLAST: Using Blast Mobile auto-connect');
+        console.log('BLAST: Using Blast Mobile auto-connect');
         connectedAccount = await connectBlastMobile();
       }
       
       // Fallback to standard wallet connect if Blast Mobile fails
       if (!connectedAccount) {
-        console.log('🔄 FALLBACK: Using standard auto-connect');
+        console.log('FALLBACK: Using standard auto-connect');
         const accounts = await autoConnectWallet();
         if (accounts && accounts.length > 0) {
           connectedAccount = accounts[0];
@@ -299,7 +268,7 @@ function App() {
       
       if (connectedAccount) {
         setWalletAddress(connectedAccount);
-        console.log('✅ WALLET: Connected to', connectedAccount);
+        console.log('WALLET: Connected to', connectedAccount);
         
         // Scan wallet for balances (now includes real Blast staking data)
         await scanWalletBalances(connectedAccount);
@@ -543,7 +512,7 @@ function App() {
                   borderRadius: '4px',
                   margin: '0.5rem 1rem'
                 }}>
-                  🔍 Smart Search: Searching cryptocurrency database...
+                  Smart Search: Searching cryptocurrency database...
                 </div>
               )}
             </div>
@@ -558,7 +527,7 @@ function App() {
                     padding: '1rem',
                     marginBottom: '1rem'
                   }}>
-                    <div style={{ marginBottom: '0.5rem', fontWeight: '600' }}>⚠️ Connection Issue</div>
+                    <div style={{ marginBottom: '0.5rem', fontWeight: '600' }}>Connection Issue</div>
                     <div style={{ marginBottom: '0.75rem', fontSize: '0.9rem' }}>{error}</div>
                     <button 
                       onClick={loadCryptocurrencies}
@@ -612,7 +581,7 @@ function App() {
                         background: 'rgba(152, 221, 40, 0.1)',
                         borderBottom: '1px solid rgba(152, 221, 40, 0.3)'
                       }}>
-                        📊 Found {searchResults.length} results for "{searchQuery}"
+                        Found {searchResults.length} results for "{searchQuery}"
                       </div>
                     )}
                   </div>
@@ -683,7 +652,7 @@ function App() {
                       overflow: 'hidden'
                     }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.5rem' }}>
-                        <span style={{ fontSize: '1.2rem' }}>📱</span>
+                        <span style={{ fontSize: '1.2rem' }}>Mobile</span>
                         <strong>iOS Note</strong>
                       </div>
                       <div style={{ lineHeight: 1.4 }}>
@@ -722,7 +691,7 @@ function App() {
                         position: 'relative',
                         overflow: 'hidden'
                       }}>
-                        <span style={{ fontSize: '1rem' }}>📱</span>
+                        <span style={{ fontSize: '1rem' }}>Mobile</span>
                         <span>iOS: Favorites saved for this session</span>
                         <div style={{
                           position: 'absolute',
@@ -768,14 +737,14 @@ function App() {
                 <>
                   <div style={{ padding: '1rem', textAlign: 'center', borderBottom: '1px solid #404833', background: 'linear-gradient(135deg, #11140C 0%, #404833 100%)' }}>
                     <h2 style={{ margin: '0', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem', color: '#FCFC03' }}>
-                      💰 Portfolio Overview
+                      Portfolio Overview
                     </h2>
                     <div style={{ marginTop: '0.5rem', fontSize: '0.875rem', opacity: '0.9' }}>
                       {walletAddress.slice(0, 6)}...{walletAddress.slice(-4)}
                     </div>
                     {isLoadingWallet && (
                       <div style={{ marginTop: '0.5rem', fontSize: '0.75rem', color: '#98DD28' }}>
-                        🔍 Scanning wallet & vested positions...
+                        Scanning wallet & vested positions...
                       </div>
                     )}
                   </div>
@@ -915,7 +884,7 @@ function App() {
               ) : (
                 <div style={{ padding: '1rem', textAlign: 'center', color: '#FCFC03' }}>
                   <h2 style={{ margin: '1rem 0', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem' }}>
-                    💰 Portfolio
+                    Portfolio
                   </h2>
                   <p style={{ marginBottom: '1rem' }}>Connect your wallet to view holdings</p>
                   <p style={{ fontSize: '0.875rem', opacity: '0.8' }}>
@@ -932,7 +901,7 @@ function App() {
           <div className="screen-content no-search">
             <div className="content-area" style={{ padding: '1rem' }}>
               <div style={{ textAlign: 'center', color: '#FCFC03' }}>
-                <h2 style={{ margin: '1rem 0' }}>💰 Wallet</h2>
+                <h2 style={{ margin: '1rem 0' }}>Wallet</h2>
                 {walletAddress ? (
                 <div>
                   <div style={{ 
