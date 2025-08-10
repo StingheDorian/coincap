@@ -170,7 +170,16 @@ class JSONBinStorage {
   async init(): Promise<boolean> {
     try {
       // Try to get existing bin ID for this user
-      this.binId = localStorage.getItem(`jsonbin-${this.userId}`);
+      console.log('📦 JSONBin: Initializing for user:', this.userId);
+      
+      try {
+        this.binId = localStorage.getItem(`jsonbin-${this.userId}`);
+        console.log('📦 JSONBin: Found existing bin ID in localStorage:', this.binId);
+      } catch (error) {
+        console.log('📦 JSONBin: localStorage access failed (iOS limitation):', error);
+        this.binId = null;
+      }
+      
       console.log('📦 JSONBin storage initialized');
       return true;
     } catch (error) {
@@ -190,15 +199,16 @@ class JSONBinStorage {
       };
 
       const headers: Record<string, string> = {
-        'Content-Type': 'application/json'
+        'Content-Type': 'application/json',
+        'X-Bin-Name': `coincap-favorites-${this.userId}`
       };
 
-      // Add API key if available
-      if (this.apiKey && this.apiKey !== '$2a$10$SvrqFvVX4gPJfpyfAsUFauuFdszDXMurEPMChgZYQ5wTZE4TMJ6im') {
+      // Add API key (always use it if available)
+      if (this.apiKey) {
         headers['X-Master-Key'] = this.apiKey;
-      } else if (this.apiKey) {
-        // Use the actual API key
-        headers['X-Master-Key'] = this.apiKey;
+        console.log('📦 Using API key for JSONBin request');
+      } else {
+        console.log('⚠️ No API key available for JSONBin request');
       }
 
       let url = 'https://api.jsonbin.io/v3/b';
@@ -210,14 +220,22 @@ class JSONBinStorage {
         method = 'PUT';
       }
 
+      console.log('📦 JSONBin: Attempting to save', favorites.length, 'favorites');
+      console.log('📦 JSONBin: URL:', url, 'Method:', method);
+      console.log('📦 JSONBin: Headers:', Object.keys(headers));
+
       const response = await fetch(url, {
         method: method,
         headers: headers,
         body: JSON.stringify(data)
       });
 
+      console.log('📦 JSONBin: Response status:', response.status);
+      console.log('📦 JSONBin: Response ok:', response.ok);
+
       if (response.ok) {
         const result = await response.json();
+        console.log('📦 JSONBin: Response metadata:', result.metadata);
         
         // Save bin ID for future updates
         if (result.metadata && result.metadata.id) {
@@ -225,15 +243,29 @@ class JSONBinStorage {
           this.binId = binId;
           try {
             localStorage.setItem(`jsonbin-${this.userId}`, binId);
+            console.log('📦 JSONBin: Bin ID saved for future updates:', binId);
           } catch (e) {
-            // Ignore localStorage errors
+            console.log('📦 JSONBin: Could not save bin ID to localStorage (iOS limitation)');
+            // Store in memory for this session
+            console.log('📦 JSONBin: Using in-memory bin ID for session');
           }
         }
 
         console.log('📦 JSONBin: Favorites saved successfully to cloud');
         return true;
       } else {
-        console.log('📦 JSONBin save failed:', response.status);
+        const errorText = await response.text();
+        console.log('📦 JSONBin save failed:', response.status, response.statusText);
+        console.log('📦 JSONBin error details:', errorText);
+        
+        // Try to parse error JSON if possible
+        try {
+          const errorJson = JSON.parse(errorText);
+          console.log('📦 JSONBin parsed error:', errorJson);
+        } catch (e) {
+          console.log('📦 JSONBin raw error text:', errorText);
+        }
+        
         return false;
       }
     } catch (error) {
@@ -249,25 +281,40 @@ class JSONBinStorage {
     }
 
     try {
+      console.log('📦 JSONBin: Loading favorites from bin:', this.binId);
+      
       const headers: Record<string, string> = {};
       
       if (this.apiKey) {
         headers['X-Master-Key'] = this.apiKey;
+        console.log('📦 JSONBin: Using API key for load request');
       }
 
-      const response = await fetch(`https://api.jsonbin.io/v3/b/${this.binId}/latest`, {
+      const url = `https://api.jsonbin.io/v3/b/${this.binId}/latest`;
+      console.log('📦 JSONBin: Load URL:', url);
+
+      const response = await fetch(url, {
         headers: headers
       });
 
+      console.log('📦 JSONBin: Load response status:', response.status);
+
       if (response.ok) {
         const result = await response.json();
+        console.log('📦 JSONBin: Load response structure:', Object.keys(result));
         
         if (result.record && result.record.favorites && Array.isArray(result.record.favorites)) {
           console.log('📦 JSONBin: Favorites loaded from cloud:', result.record.favorites.length, 'items');
+          console.log('📦 JSONBin: Loaded favorites:', result.record.favorites);
           return result.record.favorites;
+        } else {
+          console.log('📦 JSONBin: Invalid response structure or no favorites found');
+          console.log('📦 JSONBin: Response record:', result.record);
         }
       } else {
-        console.log('📦 JSONBin load failed:', response.status);
+        const errorText = await response.text();
+        console.log('📦 JSONBin load failed:', response.status, response.statusText);
+        console.log('📦 JSONBin load error details:', errorText);
       }
 
       return null;
