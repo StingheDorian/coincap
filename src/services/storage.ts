@@ -1,7 +1,10 @@
 /**
  * Robust storage service for iOS iframe environments
- * Uses multiple persistence strategies to ensure favorites survive app reloads
+ * Uses multiple persistence strategies including cloud storage for GitHub Pages deployment
+ * Works with static hosting (GitHub Pages, Netlify, Vercel)
  */
+
+import { JSONBinStorage } from './cloudStorage';
 
 // Strategy 1: IndexedDB (most reliable in iOS iframes)
 class IndexedDBStorage {
@@ -231,6 +234,7 @@ export class FavoritesStorage {
   private indexedDB = new IndexedDBStorage();
   private memory = new MemoryStorage();
   private traditional = new TraditionalStorage();
+  private cloud = new JSONBinStorage(); // Simple cloud storage for GitHub Pages
   private initialized = false;
   private platformInfo = detectPlatform();
 
@@ -241,20 +245,23 @@ export class FavoritesStorage {
     // Initialize IndexedDB (excellent for Android, best option for iOS iframe)
     const indexedDBReady = await this.indexedDB.init();
     
+    // Initialize cloud storage (works great with GitHub Pages)
+    const cloudReady = await this.cloud.init();
+    
     // Android-specific optimizations
     if (this.platformInfo.platform === 'android') {
       console.log('🤖 Android detected: Storage should work excellently');
       if (this.platformInfo.isIframe) {
-        console.log('📱 Android iframe: IndexedDB + localStorage both reliable');
+        console.log('📱 Android iframe: IndexedDB + localStorage + cloud all reliable');
       }
     }
     
     // iOS-specific messaging
     if (this.platformInfo.platform === 'ios' && this.platformInfo.isIframe) {
-      console.log('🍎 iOS iframe detected: Using enhanced persistence strategy');
+      console.log('🍎 iOS iframe detected: Using enhanced persistence strategy with cloud backup');
     }
     
-    console.log(`Storage systems ready: IndexedDB=${indexedDBReady}, Platform=${this.platformInfo.platform}, Reliability=${this.platformInfo.storageReliability}`);
+    console.log(`Storage systems ready: IndexedDB=${indexedDBReady}, Cloud=${cloudReady}, Platform=${this.platformInfo.platform}, Reliability=${this.platformInfo.storageReliability}`);
     this.initialized = true;
   }
 
@@ -280,9 +287,14 @@ export class FavoritesStorage {
     // Traditional storage - very reliable on Android, good fallback for others
     savePromises.push(this.traditional.save(favorites));
     
+    // Cloud storage - perfect for GitHub Pages deployment, works everywhere
+    savePromises.push(this.cloud.save(favorites));
+    
     // On Android, we can be more aggressive with parallel saves since storage is more reliable
     if (this.platformInfo.platform === 'android') {
-      console.log('🤖 Android: Using optimized parallel save strategy');
+      console.log('🤖 Android: Using optimized parallel save strategy with cloud backup');
+    } else if (this.platformInfo.platform === 'ios' && this.platformInfo.isIframe) {
+      console.log('🍎 iOS iframe: Using cloud storage as primary backup');
     }
 
     try {
@@ -292,6 +304,8 @@ export class FavoritesStorage {
       
       if (successful === 0) {
         console.warn('⚠️ All persistent storage methods failed, data only in memory');
+      } else if (successful >= 2) {
+        console.log('✅ High reliability: Favorites saved to multiple persistent storage systems');
       }
     } catch (error) {
       console.warn('Some storage methods failed:', error);
@@ -311,18 +325,20 @@ export class FavoritesStorage {
     
     if (this.platformInfo.platform === 'android') {
       // Android: localStorage is very reliable, so try it first after memory
-      console.log('🤖 Android: Using localStorage-priority strategy');
+      console.log('🤖 Android: Using localStorage-priority strategy with cloud backup');
       loaders = [
         async () => this.memory.load(),
         () => this.traditional.load(), // localStorage works great on Android
-        () => this.indexedDB.load()
+        () => this.indexedDB.load(),
+        () => this.cloud.load() // Cloud as backup
       ];
     } else if (this.platformInfo.platform === 'ios' && this.platformInfo.isIframe) {
-      // iOS iframe: IndexedDB is most reliable
-      console.log('🍎 iOS iframe: Using IndexedDB-priority strategy');
+      // iOS iframe: Cloud storage is most reliable for GitHub Pages deployment
+      console.log('🍎 iOS iframe: Using cloud-priority strategy for GitHub Pages');
       loaders = [
         async () => this.memory.load(),
-        () => this.indexedDB.load(), // Best for iOS iframe
+        () => this.cloud.load(), // Best for iOS iframe + GitHub Pages
+        () => this.indexedDB.load(),
         () => this.traditional.load()
       ];
     } else {
@@ -330,7 +346,8 @@ export class FavoritesStorage {
       loaders = [
         async () => this.memory.load(),
         () => this.indexedDB.load(),
-        () => this.traditional.load()
+        () => this.traditional.load(),
+        () => this.cloud.load()
       ];
     }
 
@@ -365,6 +382,10 @@ export class FavoritesStorage {
     const traditionalWorks = await this.traditional.save(testData);
     console.log('Traditional storage test:', traditionalWorks ? '✅ Working' : '❌ Failed');
     
+    console.log('Testing Cloud storage...');
+    const cloudWorks = await this.cloud.save(testData);
+    console.log('Cloud storage test:', cloudWorks ? '✅ Working' : '❌ Failed');
+    
     console.log('Testing Memory storage...');
     this.memory.save(testData);
     const memoryResult = this.memory.load();
@@ -387,6 +408,7 @@ export class FavoritesStorage {
       memoryAge: this.memory.getAge() > 0 ? `${Math.round(this.memory.getAge() / 1000)}s ago` : 'never',
       indexedDB: this.indexedDB ? 'initialized' : 'not available',
       traditional: 'available',
+      cloud: 'available (JSONBin)',
       recommendation: this.getStorageRecommendation()
     };
   }
@@ -395,14 +417,14 @@ export class FavoritesStorage {
   private getStorageRecommendation(): string {
     if (this.platformInfo.platform === 'android') {
       return this.platformInfo.isIframe 
-        ? 'Android iframe: Excellent storage support, all methods reliable'
-        : 'Android native: Perfect storage support';
+        ? 'Android iframe: Excellent storage support, cloud backup for GitHub Pages'
+        : 'Android native: Perfect storage support with cloud sync';
     } else if (this.platformInfo.platform === 'ios') {
       return this.platformInfo.isIframe
-        ? 'iOS iframe: Use IndexedDB primary, localStorage backup'
-        : 'iOS native: Good storage support';
+        ? 'iOS iframe: Cloud storage primary, IndexedDB backup - Perfect for GitHub Pages!'
+        : 'iOS native: Good storage support with cloud sync';
     } else {
-      return 'Desktop: All storage methods available';
+      return 'Desktop: All storage methods available with cloud sync';
     }
   }
 }
