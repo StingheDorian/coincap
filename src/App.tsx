@@ -103,8 +103,10 @@ function App() {
         await favoritesStorage.init();
         console.log('Robust storage system initialized');
         
-        // Test storage systems in debug mode
-        if (window.location.hostname === 'localhost') {
+        // Test storage systems in debug mode or if we detect iOS iframe issues
+        if (window.location.hostname === 'localhost' || 
+            (navigator.userAgent.includes('iPhone') || navigator.userAgent.includes('iPad')) && window !== window.top) {
+          console.log('🧪 Running storage tests due to debug/iOS iframe environment...');
           await favoritesStorage.testStorage();
         }
         
@@ -165,9 +167,12 @@ function App() {
 
   // Save favorites to storage whenever favorites change (including when cleared)
   useEffect(() => {
-    // Don't save on initial load (when favorites is empty)
+    // Don't save on initial load (when favorites is empty and we haven't loaded yet)
     if (favorites.size > 0) {
+      console.log('💾 Saving favorites to storage:', Array.from(favorites));
       saveFavorites(favorites);
+    } else if (favorites.size === 0) {
+      console.log('💾 Favorites cleared, size is 0');
     }
   }, [favorites, saveFavorites]);
 
